@@ -4,14 +4,11 @@ import dotenv from "dotenv";
 import { sendWhatsappMessage } from "./services/zapi";
 import fs from 'fs';
 import path from 'path';
-import { generateTrainingPlan } from './services/openaiService';
+import { generateTrainingPlan, askQuestionToAI } from './services/openaiService';
 import { generatePlanPDF } from './services/pdfService';
+import { getOrCreateClient, getActiveConversation, updateConversationContext, updateClientAfterPayment, supabase, savePlanText } from './services/supabaseService';
 
 dotenv.config();
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Estados possíveis do cliente
 const STATES = {
@@ -20,6 +17,7 @@ const STATES = {
   WAITING_FOR_PAYMENT: "WAITING_FOR_PAYMENT",
   PAID: "PAID",
   SENT_PLAN: "SENT_PLAN",
+  QUESTIONS: "QUESTIONS",
 } as const;
 type State = typeof STATES[keyof typeof STATES];
 
@@ -60,7 +58,7 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
     }
 
     // Buscar ou criar cliente
-    const client = await getOrCreateClient(from, res);
+    const client = await getOrCreateClient(from);
     if (!client) return;
 
     // Buscar conversa ativa
@@ -81,6 +79,9 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
       case STATES.PAID:
         await handlePaidState(from, conversation);
         break;
+      case STATES.QUESTIONS:
+        await handleQuestionsState(from, text, conversation);
+        break;
       default:
         await handleStartState(from, client.id);
     }
@@ -91,61 +92,6 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
     res.status(500).send("Erro interno do servidor");
   }
 };
-
-// Busca ou cria cliente
-async function getOrCreateClient(phone: string, res: Response) {
-  try {
-    const { data: client, error } = await supabase
-      .from("clients")
-      .select("*")
-      .eq("phone", phone)
-      .single();
-    if (client) {
-      return client;
-    }
-    if (error && error.code !== 'PGRST116') {
-      console.log("Erro ao buscar cliente:", error);
-      res.status(500).send("Erro ao buscar cliente");
-      return null;
-    }
-    // Criar cliente se não existir
-    const { data: newClient, error: newClientError } = await supabase
-      .from("clients")
-      .insert([{ phone }])
-      .select()
-      .single();
-    if (newClientError) {
-      console.log("Erro ao criar cliente:", newClientError);
-      res.status(500).send("Erro ao criar cliente");
-      return null;
-    }
-    return newClient;
-  } catch (error) {
-    console.log("Erro na busca/criação do cliente:", error);
-    res.status(500).send("Erro ao processar cliente");
-    return null;
-  }
-}
-
-// Busca conversa ativa
-async function getActiveConversation(clientId: string) {
-  try {
-    const { data: conversation, error } = await supabase
-      .from("conversations")
-      .select("*")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-    if (error && error.code !== 'PGRST116') {
-      console.log("Erro ao buscar conversa:", error);
-    }
-    return conversation;
-  } catch (error) {
-    console.log("Erro na busca da conversa:", error);
-    return null;
-  }
-}
 
 // Inicia o fluxo perguntando o nome
 async function handleStartState(from: string, clientId: string) {
@@ -241,37 +187,66 @@ async function handlePaidState(from: string, conversation: any) {
     // Gerar plano com OpenAI
     const plano = await generateTrainingPlan(context);
 
+    // Salvar texto do plano no banco
+    await savePlanText(conversation.client_id, plano);
+
     // Gerar PDF
     const pdfPath = path.join(__dirname, `plano_${from}.pdf`);
     await generatePlanPDF(context, plano, pdfPath);
 
-    // Enviar PDF ao usuário (A Z-API não suporta envio direto de arquivos, então envie um link ou mensagem informando)
-    await sendWhatsappMessage(from, 'Seu plano personalizado está pronto! (Funcionalidade de envio de PDF em desenvolvimento)');
-    // Exemplo: await sendWhatsappMessage(from, `Baixe seu plano aqui: [LINK_DO_PDF]`);
+    // Upload para Supabase Storage
+    const pdfData = fs.readFileSync(pdfPath);
+    const fileName = `planos/plano_${from}_${Date.now()}.pdf`;
+    const { data, error } = await supabase.storage
+      .from('pdfs')
+      .upload(fileName, pdfData, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+    if (error) {
+      console.error('Erro ao fazer upload do PDF:', error);
+      await sendWhatsappMessage(from, 'Erro ao enviar seu plano em PDF. Tente novamente mais tarde.');
+      fs.unlink(pdfPath, () => {});
+      return;
+    }
+
+    // Gerar URL pública
+    const { data: publicUrlData } = supabase.storage.from('pdfs').getPublicUrl(fileName);
+    const publicUrl = publicUrlData?.publicUrl;
+    if (publicUrl) {
+      await sendWhatsappMessage(from, `Seu plano personalizado em PDF está pronto! Baixe aqui: ${publicUrl}`);
+      await updateClientAfterPayment(conversation.client_id, publicUrl, context);
+      // Atualizar estado da conversa para QUESTIONS
+      await supabase
+        .from('conversations')
+        .update({ state: STATES.QUESTIONS })
+        .eq('id', conversation.id);
+      await sendWhatsappMessage(from, 'Agora você pode tirar dúvidas sobre seu plano! Envie sua pergunta.');
+    } else {
+      await sendWhatsappMessage(from, 'Seu plano foi gerado, mas não foi possível obter o link do PDF.');
+    }
 
     // Limpar PDF temporário
     fs.unlink(pdfPath, () => {});
   } catch (error) {
+    console.log("Erro no estado PAID:", error);
     console.error('Erro ao gerar/enviar plano:', error);
-    await sendWhatsappMessage(from, 'Ocorreu um erro ao gerar seu plano. Tente novamente mais tarde.');
+    await sendWhatsappMessage(from, `Error: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
   }
 }
 
-// Atualiza o contexto da conversa
-async function updateConversationContext(conversationId: string, context: ClientContext) {
-  if (!conversationId) {
-    console.log("ERRO: ID da conversa não fornecido");
-    return;
-  }
+// Adicionar handler para o estado QUESTIONS
+async function handleQuestionsState(from: string, text: string, conversation: any) {
   try {
-    const { error } = await supabase
-      .from("conversations")
-      .update({ context })
-      .eq("id", conversationId);
-    if (error) {
-      console.log("Erro ao atualizar contexto:", error);
+    const context: ClientContext = conversation?.context || {};
+    if (!text.trim()) {
+      await sendWhatsappMessage(from, 'Por favor, envie sua dúvida sobre o plano.');
+      return;
     }
+    const resposta = await askQuestionToAI(conversation.client_id, context, text);
+    await sendWhatsappMessage(from, resposta);
   } catch (error) {
-    console.log("Erro na atualização do contexto:", error);
+    console.error('Erro ao responder dúvida:', error);
+    await sendWhatsappMessage(from, 'Ocorreu um erro ao responder sua dúvida. Tente novamente mais tarde.');
   }
 }
