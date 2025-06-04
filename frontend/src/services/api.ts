@@ -1,0 +1,118 @@
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:3000/api/dashboard';
+
+// Configurar axios
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interfaces
+export interface Client {
+  id: string;
+  phone: string;
+  name?: string;
+  age?: number;
+  gender?: string;
+  height?: number;
+  weight?: number;
+  goal?: string;
+  activity_level?: string;
+  dietary_restrictions?: string;
+  paid: boolean;
+  plan_url?: string;
+  plan_text?: string;
+  ai_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+  last_context?: Record<string, unknown>;
+  last_message_at?: string;
+}
+
+export interface Message {
+  id: string;
+  client_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  created_at: string;
+}
+
+export interface PendingPlan {
+  id: string;
+  client_id: string;
+  client_phone: string;
+  plan_content: string;
+  created_at: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface ClientStats {
+  totalMessages: number;
+  plansReceived: number;
+  lastActivity: string | null;
+}
+
+export interface DashboardStats {
+  totalClients: number;
+  activeConversations: number;
+  pendingPlans: number;
+  todayMessages: number;
+}
+
+export interface RecentActivity {
+  id: string;
+  clientPhone: string;
+  clientName?: string;
+  type: 'message' | 'plan' | 'client';
+  content: string;
+  timestamp: string;
+  status: 'active' | 'pending' | 'completed';
+}
+
+// API calls
+export const dashboardAPI = {
+  // Dashboard
+  getDashboardStats: (): Promise<DashboardStats> =>
+    api.get('/stats').then(response => response.data),
+
+  getRecentActivity: (): Promise<RecentActivity[]> =>
+    api.get('/recent-activity').then(response => response.data),
+
+  // Clientes
+  getClients: (): Promise<Client[]> => 
+    api.get('/clients').then(response => response.data),
+
+  getClient: (clientId: string): Promise<Client> =>
+    api.get(`/clients/${clientId}`).then(response => response.data),
+
+  getClientStats: (clientId: string): Promise<ClientStats> =>
+    api.get(`/clients/${clientId}/stats`).then(response => response.data),
+
+  updateClient: (clientId: string, data: Partial<Client>): Promise<void> =>
+    api.put(`/clients/${clientId}`, data).then(response => response.data),
+
+  toggleAI: (clientId: string): Promise<{ ai_enabled: boolean }> =>
+    api.post(`/clients/${clientId}/toggle-ai`).then(response => response.data),
+
+  // Mensagens
+  getMessages: (clientId: string): Promise<Message[]> =>
+    api.get(`/clients/${clientId}/messages`).then(response => response.data),
+
+  sendMessage: (clientId: string, content: string): Promise<void> =>
+    api.post(`/clients/${clientId}/messages`, { content }).then(response => response.data),
+
+  // Planos Pendentes
+  getPendingPlans: (): Promise<PendingPlan[]> =>
+    api.get('/pending-plans').then(response => response.data),
+
+  reviewPlan: (planId: string, status: 'approved' | 'rejected', editedContent?: string): Promise<void> =>
+    api.post(`/pending-plans/${planId}/review`, { status, editedContent }).then(response => response.data),
+
+  createPendingPlan: (clientId: string, planContent: string): Promise<{ planId: string }> =>
+    api.post('/pending-plans', { clientId, planContent }).then(response => response.data),
+};
+
+export default api; 
