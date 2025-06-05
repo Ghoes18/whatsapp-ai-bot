@@ -254,6 +254,27 @@ const Dashboard: React.FC = () => {
             >
               Gerenciar Clientes
             </Button>
+            
+            {/* Debug Button */}
+            <Button
+              variant="contained"
+              fullWidth
+              sx={{ mt: 2, backgroundColor: '#FF5722' }}
+              onClick={async () => {
+                try {
+                  console.log('Testando conectividade da API...');
+                  const response = await fetch('http://localhost:3000/api/dashboard/debug');
+                  const data = await response.json();
+                  console.log('Resposta do debug:', data);
+                  alert(`API Status: ${JSON.stringify(data, null, 2)}`);
+                } catch (error) {
+                  console.error('Erro ao testar API:', error);
+                  alert(`Erro ao conectar com a API: ${error}`);
+                }
+              }}
+            >
+              🔧 Debug API
+            </Button>
           </Paper>
         </Grid>
       </Grid>

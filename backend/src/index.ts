@@ -66,8 +66,8 @@ export { io };
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`Dashboard API: http://localhost:${PORT}/api/dashboard`);
+  console.log(`Health check: https://f327-2001-8a0-c755-e800-c508-3a56-56b9-4afa.ngrok-free.app/health`);
+  console.log(`Dashboard API: https://f327-2001-8a0-c755-e800-c508-3a56-56b9-4afa.ngrok-free.app/api/dashboard`);
 });
 
 // Graceful shutdown

@@ -29,7 +29,7 @@ Este backend implementa um bot de WhatsApp para clientes que vendem planos de tr
 2. Configure variáveis de ambiente (`.env`):
    - `SUPABASE_URL`, `SUPABASE_KEY`, `ZAPI_URL`, `ZAPI_TOKEN`, etc.
 3. Inicie o servidor: `npm run dev`
-4. Exponha localmente (opcional): `ngrok http 3001`
+4. Exponha localmente (opcional): `ngrok http 3000`
 5. Configure o webhook no painel da Z-API para apontar para sua URL pública.
 
 ## Observações

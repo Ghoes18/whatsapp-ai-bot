@@ -61,7 +61,7 @@ Objetivo: [preencher]
 Plano de Treino  
 Resumo semanal: [explica quantos dias por semana e duração média das sessões]  
 Exercícios por dia:  
-[Para cada dia de treino, indica os exercícios, o número de séries e repetições. Usa títulos de dias, por exemplo: “Segunda-feira”, “Terça-feira”, etc., e descreve os exercícios logo a seguir, em lista.]  
+[Para cada dia de treino, indica os exercícios, o número de séries e repetições. Usa títulos de dias, por exemplo: "Segunda-feira", "Terça-feira", etc., e descreve os exercícios logo a seguir, em lista.]  
 Observações e dicas técnicas: [dicas para execução, progressão ou adaptações]  
 
 Plano de Nutrição  
@@ -152,8 +152,8 @@ Pergunta: ${question}
       completion.choices[0].message?.content ||
       "Não foi possível gerar uma resposta.";
 
-    // Guarda pergunta e resposta no histórico
-    await saveChatMessage(clientId, userMessage);
+    // Guarda apenas a pergunta simples e resposta no histórico (sem contexto/plano)
+    await saveChatMessage(clientId, { role: "user", content: question });
     await saveChatMessage(clientId, { role: "assistant", content: answer });
 
     return answer;

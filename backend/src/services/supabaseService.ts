@@ -16,7 +16,7 @@ export async function getOrCreateClient(phone: string) {
   if (error && error.code !== 'PGRST116') throw error;
   const { data: newClient, error: newClientError } = await supabase
     .from('clients')
-    .insert([{ phone }])
+    .insert([{ phone, ai_enabled: true }])
     .select()
     .single();
   if (newClientError) throw newClientError;

@@ -32,27 +32,108 @@ interface ClientContext {
   [key: string]: any;
 }
 
+// Função helper para salvar mensagens enviadas pelo bot
+async function saveAssistantMessage(clientId: string, content: string) {
+  try {
+    const { error: messageError } = await supabase.from("chat_messages").insert([
+      {
+        client_id: clientId,
+        role: "assistant",
+        content: content,
+      },
+    ]);
+
+    if (messageError) {
+      console.error("Erro ao salvar mensagem do assistente:", messageError);
+    } else {
+      console.log('Mensagem do assistente salva com sucesso');
+    }
+  } catch (error) {
+    console.error('Erro ao salvar mensagem do assistente:', error);
+  }
+}
+
 // Handler principal do webhook
 export const handleWebhook: RequestHandler = async (req: Request, res: Response): Promise<void> => {
   try {
-    const message = req.body || {};
+    console.log("=== WEBHOOK RECEBIDO ===");
+    console.log("Headers:", req.headers);
+    console.log("Body completo:", JSON.stringify(req.body, null, 2));
 
-    // EVITAR LOOP: Ignore mensagens enviadas pelo próprio bot
-    if (message.fromMe || message.fromApi) {
-      res.status(200).send('Mensagem do bot ignorada');
+    // Tentar diferentes estruturas de mensagem que o ZAPI pode enviar
+    let message = req.body.message;
+    
+    // Se não encontrou 'message', tentar outras estruturas possíveis
+    if (!message) {
+      console.log("❌ Campo 'message' não encontrado, tentando estruturas alternativas...");
+      
+      // Verificar se é uma estrutura direta
+      if (req.body.phone || req.body.from || req.body.remoteJid) {
+        message = req.body;
+        console.log("✅ Usando req.body diretamente como mensagem");
+      }
+      // Verificar outras possíveis estruturas
+      else if (req.body.data?.message) {
+        message = req.body.data.message;
+        console.log("✅ Encontrado em req.body.data.message");
+      }
+      else if (req.body.webhook?.message) {
+        message = req.body.webhook.message;
+        console.log("✅ Encontrado em req.body.webhook.message");
+      }
+      else {
+        console.log("❌ ERRO: Estrutura de mensagem não reconhecida");
+        console.log("Campos disponíveis no body:", Object.keys(req.body));
+        res.status(400).send("Estrutura de mensagem inválida");
+        return;
+      }
+    }
+
+    console.log("📱 Mensagem processada:", JSON.stringify(message, null, 2));
+
+    // Extrair dados principais com mais flexibilidade
+    const from: string | undefined = 
+      message.phone || 
+      message.from || 
+      message.remoteJid || 
+      message.sender ||
+      message.chatId;
+      
+    const text: string = 
+      message.text?.message || 
+      message.body || 
+      message.content ||
+      message.text ||
+      message.message ||
+      '';
+
+    console.log("📋 Dados extraídos:", { from, text });
+
+    // Verificar se é realmente uma mensagem de texto (ignorar status, typing, etc.)
+    if (message.messageType && message.messageType !== 'textMessage') {
+      console.log(`📄 Ignorando mensagem do tipo: ${message.messageType}`);
+      res.status(200).send("Tipo de mensagem não suportado");
       return;
     }
 
-    // Extrair dados principais
-    const from: string | undefined = message.phone || message.from;
-    const text: string = message.text?.message || message.body || '';
+    // Ignorar webhooks de status de mensagem (entrega, leitura, etc.) mas não "RECEIVED"
+    const statusToIgnore = message.status && ['SENT', 'DELIVERED', 'READ'].includes(message.status);
+    const bodyStatusToIgnore = req.body.status && ['SENT', 'DELIVERED', 'READ'].includes(req.body.status);
+    
+    if (statusToIgnore || bodyStatusToIgnore || message.ack) {
+      console.log(`📊 Ignorando webhook de status: ${message.status || req.body.status || 'ACK'}`);
+      res.status(200).send("Status de mensagem ignorado");
+      return;
+    }
 
     if (!from) {
       console.log("❌ ERRO: Número do remetente não encontrado na mensagem");
+      console.log("Campos tentados: phone, from, remoteJid, sender, chatId");
       res.status(400).send("Número do remetente não encontrado");
       return;
     }
     if (!text.trim()) {
+      console.log("⚠️ Mensagem vazia ignorada");
       res.status(200).send("Mensagem vazia ignorada");
       return;
     }
@@ -60,6 +141,33 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
     // Buscar ou criar cliente
     const client = await getOrCreateClient(from);
     if (!client) return;
+
+    // SALVAR MENSAGEM RECEBIDA NA TABELA CHAT_MESSAGES
+    console.log('Salvando mensagem recebida via WhatsApp...');
+    try {
+      const { error: messageError } = await supabase.from("chat_messages").insert([
+        {
+          client_id: client.id,
+          role: "user",
+          content: text,
+        },
+      ]);
+
+      if (messageError) {
+        console.error("Erro ao salvar mensagem recebida:", messageError);
+      } else {
+        console.log('Mensagem recebida salva com sucesso');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar mensagem recebida:', error);
+    }
+
+    // Verificar se a IA está ativa para este cliente
+    if (!client.ai_enabled) {
+      console.log(`IA desativada para cliente ${client.id}. Mensagem ignorada.`);
+      res.status(200).send("IA desativada para este cliente");
+      return;
+    }
 
     // Buscar conversa ativa
     const conversation = await getActiveConversation(client.id);
@@ -111,7 +219,10 @@ async function handleStartState(from: string, clientId: string) {
       console.log("Erro ao criar conversa:", newConvError);
       return;
     }
-    await sendWhatsappMessage(from, "Olá! Qual seu nome?");
+    
+    const message = "Olá! Qual seu nome?";
+    await sendWhatsappMessage(from, message);
+    await saveAssistantMessage(clientId, message);
   } catch (error) {
     console.log("Erro no estado START:", error);
   }
@@ -124,36 +235,84 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
     if (!context.name) {
       context.name = text;
       await updateConversationContext(conversation?.id, context);
-      await sendWhatsappMessage(from, `Prazer, ${text}! Qual sua idade?`);
+      const message = `Prazer, ${text}! Qual sua idade?`;
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
     } else if (!context.age) {
       context.age = text;
       await updateConversationContext(conversation?.id, context);
-      await sendWhatsappMessage(from, "Qual seu objetivo principal? (ex: emagrecer, ganhar massa, etc)");
+      const message = "Qual seu objetivo principal? (ex: emagrecer, ganhar massa, etc)";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
     } else if (!context.goal) {
       context.goal = text;
       await updateConversationContext(conversation?.id, context);
-      await sendWhatsappMessage(from, "Perfeito! Agora preciso de mais algumas informações:");
-      await sendWhatsappMessage(from, "Qual seu gênero? (masculino/feminino)");
+      const message1 = "Perfeito! Agora preciso de mais algumas informações:";
+      const message2 = "Qual seu gênero? (masculino/feminino)";
+      await sendWhatsappMessage(from, message1);
+      await sendWhatsappMessage(from, message2);
+      await saveAssistantMessage(conversation.client_id, message1);
+      await saveAssistantMessage(conversation.client_id, message2);
     } else if (!context.gender) {
       context.gender = text;
       await updateConversationContext(conversation?.id, context);
-      await sendWhatsappMessage(from, "Qual sua altura em cm? (ex: 175)");
+      const message = "Qual sua altura em cm? (ex: 175)";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
     } else if (!context.height) {
       context.height = text;
       await updateConversationContext(conversation?.id, context);
-      await sendWhatsappMessage(from, "Qual seu peso atual em kg? (ex: 70)");
+      const message = "Qual seu peso atual em kg? (ex: 70)";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
     } else if (!context.weight) {
       context.weight = text;
       await updateConversationContext(conversation?.id, context);
-      // Todas as informações coletadas - avançar para pagamento
+      
+      // TODAS AS INFORMAÇÕES COLETADAS - SALVAR NA TABELA CLIENTS
+      console.log('Salvando dados do cliente na tabela clients...');
+      
+      try {
+        // Atualizar dados do cliente na tabela clients
+        const { error: clientUpdateError } = await supabase
+          .from("clients")
+          .update({
+            name: context.name,
+            age: parseInt(context.age) || null,
+            gender: context.gender,
+            height: parseFloat(context.height) || null,
+            weight: parseFloat(context.weight) || null,
+            goal: context.goal,
+            last_context: context,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", conversation.client_id);
+
+        if (clientUpdateError) {
+          console.error('Erro ao atualizar dados do cliente:', clientUpdateError);
+        } else {
+          console.log('Dados do cliente salvos com sucesso!');
+        }
+      } catch (error) {
+        console.error('Erro ao salvar dados do cliente:', error);
+      }
+      
+      // Avançar para pagamento
       await supabase
         .from("conversations")
         .update({ state: STATES.WAITING_FOR_PAYMENT })
         .eq("id", conversation?.id);
-      await sendWhatsappMessage(from, `Obrigado ${context.name}! Agora você receberá o link para pagamento via Mbway.`);
-      await sendWhatsappMessage(from, "💳 Link de pagamento: [IMPLEMENTAR MBWAY]");
+        
+      const message1 = `Obrigado ${context.name}! Agora você receberá o link para pagamento via Mbway.`;
+      const message2 = "💳 Link de pagamento: [IMPLEMENTAR MBWAY]";
+      await sendWhatsappMessage(from, message1);
+      await sendWhatsappMessage(from, message2);
+      await saveAssistantMessage(conversation.client_id, message1);
+      await saveAssistantMessage(conversation.client_id, message2);
     } else {
-      await sendWhatsappMessage(from, "Suas informações já foram coletadas. Aguarde o processamento.");
+      const message = "Suas informações já foram coletadas. Aguarde o processamento.";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
     }
   } catch (error) {
     console.log("Erro no estado WAITING_FOR_INFO:", error);
@@ -187,51 +346,35 @@ async function handlePaidState(from: string, conversation: any) {
     // Gerar plano com OpenAI
     const plano = await generateTrainingPlan(context);
 
-    // Salvar texto do plano no banco
-    await savePlanText(conversation.client_id, plano);
+    // MUDANÇA: Salvar plano como PENDENTE para revisão em vez de enviar diretamente
+    console.log('Salvando plano como pendente para revisão...');
+    
+    // Importar a função savePendingPlan
+    const { savePendingPlan } = await import('./services/dashboardService');
+    
+    // Salvar como plano pendente
+    const planId = await savePendingPlan(conversation.client_id, plano);
+    
+    console.log(`Plano salvo como pendente com ID: ${planId}`);
 
-    // Gerar PDF
-    const pdfPath = path.join(__dirname, `plano_${from}.pdf`);
-    await generatePlanPDF(context, plano, pdfPath);
+    // Atualizar estado da conversa para aguardar aprovação do plano
+    await supabase
+      .from('conversations')
+      .update({ 
+        state: STATES.WAITING_FOR_PAYMENT, // Manter em pagamento até o plano ser aprovado
+        context: { ...context, pendingPlanId: planId }
+      })
+      .eq('id', conversation.id);
 
-    // Upload para Supabase Storage
-    const pdfData = fs.readFileSync(pdfPath);
-    const fileName = `planos/plano_${from}_${Date.now()}.pdf`;
-    const { data, error } = await supabase.storage
-      .from('pdfs')
-      .upload(fileName, pdfData, {
-        contentType: 'application/pdf',
-        upsert: true,
-      });
-    if (error) {
-      console.error('Erro ao fazer upload do PDF:', error);
-      await sendWhatsappMessage(from, 'Erro ao enviar seu plano em PDF. Tente novamente mais tarde.');
-      fs.unlink(pdfPath, () => {});
-      return;
-    }
+    // Notificar o cliente que o plano está sendo preparado
+    await sendWhatsappMessage(from, '✅ Pagamento confirmado! Estamos a preparar o seu plano personalizado.');
+    await sendWhatsappMessage(from, '📋 O seu plano será revisto pela nossa equipa e enviado em breve.');
+    await sendWhatsappMessage(from, '⏰ Normalmente este processo demora 24-48 horas.');
 
-    // Gerar URL pública
-    const { data: publicUrlData } = supabase.storage.from('pdfs').getPublicUrl(fileName);
-    const publicUrl = publicUrlData?.publicUrl;
-    if (publicUrl) {
-      await sendWhatsappMessage(from, `Seu plano personalizado em PDF está pronto! Baixe aqui: ${publicUrl}`);
-      await updateClientAfterPayment(conversation.client_id, publicUrl, context);
-      // Atualizar estado da conversa para QUESTIONS
-      await supabase
-        .from('conversations')
-        .update({ state: STATES.QUESTIONS })
-        .eq('id', conversation.id);
-      await sendWhatsappMessage(from, 'Agora você pode tirar dúvidas sobre seu plano! Envie sua pergunta.');
-    } else {
-      await sendWhatsappMessage(from, 'Seu plano foi gerado, mas não foi possível obter o link do PDF.');
-    }
-
-    // Limpar PDF temporário
-    fs.unlink(pdfPath, () => {});
   } catch (error) {
     console.log("Erro no estado PAID:", error);
-    console.error('Erro ao gerar/enviar plano:', error);
-    await sendWhatsappMessage(from, `Error: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
+    console.error('Erro ao gerar/salvar plano pendente:', error);
+    await sendWhatsappMessage(from, `Erro ao processar o seu plano. Por favor contacte o suporte.`);
   }
 }
 
