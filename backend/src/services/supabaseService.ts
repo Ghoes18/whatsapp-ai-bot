@@ -2,11 +2,22 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_KEY!;
-export const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn(
+    'SUPABASE_URL ou SUPABASE_KEY não configurados. ' +
+      'Operações de banco de dados serão ignoradas.'
+  );
+}
+
+export const supabase = supabaseUrl && supabaseKey
+  ? createClient(supabaseUrl, supabaseKey)
+  : (null as any);
 
 export async function getOrCreateClient(phone: string) {
+  if (!supabase) throw new Error('Supabase não configurado');
   const { data: client, error } = await supabase
     .from('clients')
     .select('*')
@@ -24,6 +35,7 @@ export async function getOrCreateClient(phone: string) {
 }
 
 export async function getActiveConversation(clientId: string) {
+  if (!supabase) throw new Error('Supabase não configurado');
   const { data: conversation, error } = await supabase
     .from('conversations')
     .select('*')
@@ -36,6 +48,7 @@ export async function getActiveConversation(clientId: string) {
 }
 
 export async function updateConversationContext(conversationId: string, context: any) {
+  if (!supabase) throw new Error('Supabase não configurado');
   if (!conversationId) throw new Error('ID da conversa não fornecido');
   const { error } = await supabase
     .from('conversations')
@@ -45,6 +58,7 @@ export async function updateConversationContext(conversationId: string, context:
 }
 
 export async function updateClientAfterPayment(clientId: string, planUrl: string, context: any) {
+  if (!supabase) throw new Error('Supabase não configurado');
   // Atualiza o cliente com status de pagamento e link do plano
   const { error } = await supabase
     .from('clients')
@@ -54,6 +68,7 @@ export async function updateClientAfterPayment(clientId: string, planUrl: string
 }
 
 export async function savePlanText(clientId: string, planText: string) {
+  if (!supabase) throw new Error('Supabase não configurado');
   const { error } = await supabase
     .from('clients')
     .update({ plan_text: planText })
@@ -62,6 +77,7 @@ export async function savePlanText(clientId: string, planText: string) {
 }
 
 export async function getPlanText(clientId: string): Promise<string | null> {
+  if (!supabase) throw new Error('Supabase não configurado');
   const { data, error } = await supabase
     .from('clients')
     .select('plan_text')

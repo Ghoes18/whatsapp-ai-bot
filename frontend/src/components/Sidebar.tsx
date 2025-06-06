@@ -18,12 +18,14 @@ import {
   Assignment as AssignmentIcon,
   WhatsApp as WhatsAppIcon
 } from '@mui/icons-material';
+import { useNotifications } from '../hooks/useNotifications';
 
 const drawerWidth = 280;
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { notifications } = useNotifications();
 
   const menuItems = [
     {
@@ -35,12 +37,13 @@ const Sidebar: React.FC = () => {
       text: 'Conversas',
       icon: <ChatIcon />,
       path: '/conversations',
+      badge: notifications.unreadMessages,
     },
     {
       text: 'Planos Pendentes',
       icon: <AssignmentIcon />,
       path: '/pending-plans',
-      badge: 3, // Você pode implementar um hook para buscar o número real
+      badge: notifications.pendingPlans,
     },
   ];
 
@@ -95,7 +98,18 @@ const Sidebar: React.FC = () => {
             >
               <ListItemIcon sx={{ color: location.pathname === item.path ? 'white' : '#25D366' }}>
                 {item.badge ? (
-                  <Badge badgeContent={item.badge} color="error">
+                  <Badge 
+                    badgeContent={item.badge} 
+                    color="error"
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        right: -3,
+                        top: 3,
+                        border: '2px solid #f8f9fa',
+                        padding: '0 4px',
+                      },
+                    }}
+                  >
                     {item.icon}
                   </Badge>
                 ) : (

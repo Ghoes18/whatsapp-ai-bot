@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api/dashboard';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/dashboard';
 
 // Configurar axios
 const api = axios.create({
@@ -26,6 +27,7 @@ export interface Client {
   plan_url?: string;
   plan_text?: string;
   ai_enabled: boolean;
+  isTyping?: boolean;
   created_at: string;
   updated_at: string;
   last_context?: Record<string, unknown>;
@@ -118,12 +120,19 @@ export const dashboardAPI = {
       });
   },
 
+  sendTyping: (clientId: string, isTyping: boolean): Promise<void> =>
+    api.post(`/clients/${clientId}/typing`, { isTyping }).then(response => response.data),
+
+  markMessageAsRead: (messageId: string): Promise<void> =>
+    api.post(`/messages/${messageId}/read`).then(response => response.data),
+
+  // Novo: Marcar todas as mensagens de um cliente como lidas (otimizado)
+  markClientMessagesAsRead: (clientId: string): Promise<{ success: boolean, markedCount: number }> =>
+    api.post(`/clients/${clientId}/messages/mark-read`).then(response => response.data),
+
   // Status de mensagens
   getMessageStatus: (messageId: string): Promise<{ delivered: boolean; read: boolean }> =>
     api.get(`/messages/${messageId}/status`).then(response => response.data),
-
-  sendTyping: (clientId: string, isTyping: boolean): Promise<void> =>
-    api.post(`/clients/${clientId}/typing`, { isTyping }).then(response => response.data),
 
   // Mídia
   sendImage: (clientId: string, imageUrl: string, caption?: string): Promise<void> =>

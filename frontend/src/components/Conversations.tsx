@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -32,39 +32,31 @@ import {
 } from "@mui/icons-material";
 import { dashboardAPI } from "../services/api";
 import type { Client, Message } from "../services/api";
+import { useNotifications } from '../hooks/useNotifications';
 
 // interface MessageStatus {
 //   delivered: boolean;
 //   read: boolean;
 // }
 
-interface ClientWithUnread extends Client {
-  unreadCount: number;
-  isTyping?: boolean;
-}
-
 const Conversations: React.FC = () => {
   const { clientId } = useParams();
   const navigate = useNavigate();
+  const { notifications, updateNotifications } = useNotifications();
   console.log('🔍 Conversations component loaded - clientId from URL:', clientId);
   
-  const [clients, setClients] = useState<ClientWithUnread[]>([]);
-  const [selectedClient, setSelectedClient] = useState<ClientWithUnread | null>(
-    null
-  );
-  const [messages, setMessages] = useState<Message[]>(() => {
-    // Tenta recuperar mensagens do localStorage específicas do cliente atual
-    if (clientId) {
-      const savedMessages = localStorage.getItem(`messages_${clientId}`);
-      return savedMessages ? JSON.parse(savedMessages) : [];
-    }
-    return [];
-  });
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadMessagesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cache de mensagens usando useMemo
+  const messagesCache = useRef<Map<string, { messages: Message[], timestamp: number }>>(new Map());
+  const CACHE_DURATION = 30000; // 30 segundos
 
   // Salva mensagens no localStorage específico do cliente
   useEffect(() => {
@@ -75,8 +67,7 @@ const Conversations: React.FC = () => {
       setClients((prevClients) =>
         prevClients.map((client) => {
           const clientMessages = messages.filter(
-            (msg) =>
-              msg.client_id === client.id && msg.role === "user" && !msg.read
+            (msg) => msg.client_id === client.id && msg.role === "user"
           );
           return {
             ...client,
@@ -135,7 +126,7 @@ const Conversations: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Função para enviar notificação de digitação - SIMPLIFICADA
+  // Função para enviar notificação de digitação
   const handleTyping = async (isTyping: boolean) => {
     if (!selectedClient) return;
     try {
@@ -169,72 +160,67 @@ const Conversations: React.FC = () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      if (loadMessagesTimeoutRef.current) {
-        clearTimeout(loadMessagesTimeoutRef.current);
-      }
     };
   }, []);
 
   const loadClients = async () => {
     try {
       const response = await dashboardAPI.getClients();
-      const clientsWithUnread = Array.isArray(response)
-        ? response.map((client) => ({
-            ...client,
-            unreadCount: 0,
-          }))
-        : [];
-      setClients(clientsWithUnread);
+      setClients(Array.isArray(response) ? response : []);
     } catch (error) {
       console.error("Erro ao carregar clientes:", error);
       setClients([]);
     }
   };
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async (forceReload = false) => {
     if (!clientId) {
       console.log('❌ loadMessages: clientId não definido');
       return;
     }
 
-    // Limpar timeout anterior se existir
-    if (loadMessagesTimeoutRef.current) {
-      clearTimeout(loadMessagesTimeoutRef.current);
+    // Verificar cache se não for reload forçado
+    if (!forceReload) {
+      const cached = messagesCache.current.get(clientId);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log(`📨 Usando mensagens do cache para cliente: ${clientId}`);
+        const sortedMessages = [...cached.messages].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        setMessages(sortedMessages);
+        return;
+      }
     }
 
-    // Debounce de 500ms para evitar chamadas excessivas
-    loadMessagesTimeoutRef.current = setTimeout(async () => {
-      console.log(`📨 Carregando mensagens para cliente: ${clientId}`);
+    console.log(`📨 Carregando mensagens para cliente: ${clientId}`);
+    
+    try {
+      const response = await dashboardAPI.getMessages(clientId);
+      console.log('📨 Resposta da API getMessages:', response);
       
-      try {
-        const response = await dashboardAPI.getMessages(clientId);
-        console.log('📨 Resposta da API getMessages:', response);
-        
-        const newMessages = Array.isArray(response) ? response : [];
-        console.log(`📨 Mensagens processadas: ${newMessages.length} mensagens`);
+      const newMessages = Array.isArray(response) ? response : [];
+      console.log(`📨 Mensagens processadas: ${newMessages.length} mensagens`);
 
-        // Ordena mensagens por data (mais antiga primeiro, ordem cronológica correta)
-        const sortedMessages = [...newMessages].sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
+      // Ordenar mensagens por data
+      const sortedMessages = [...newMessages].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
 
-        console.log(`📨 Mensagens ordenadas cronologicamente: ${sortedMessages.length} mensagens`);
-        setMessages(sortedMessages);
-        
-        // Rolar para baixo após carregar mensagens
-        setTimeout(() => scrollToBottom(), 100);
-      } catch (error) {
-        console.error("❌ Erro ao carregar mensagens:", error);
-        console.error("❌ Detalhes do erro:", {
-          message: error instanceof Error ? error.message : 'Erro desconhecido',
-          stack: error instanceof Error ? error.stack : undefined,
-          response: (error as { response?: { data?: unknown } })?.response?.data,
-          status: (error as { response?: { status?: number } })?.response?.status
-        });
-      }
-    }, 500);
-  };
+      // Atualizar cache
+      messagesCache.current.set(clientId, {
+        messages: sortedMessages,
+        timestamp: Date.now()
+      });
+
+      console.log(`📨 Mensagens ordenadas cronologicamente: ${sortedMessages.length} mensagens`);
+      setMessages(sortedMessages);
+      
+      // Rolar para baixo após carregar mensagens
+      setTimeout(() => scrollToBottom(), 100);
+    } catch (error) {
+      console.error("❌ Erro ao carregar mensagens:", error);
+    }
+  }, [clientId]);
 
   const handleSendMessage = async () => {
     console.log('🚀 handleSendMessage chamada!');
@@ -263,7 +249,7 @@ const Conversations: React.FC = () => {
         id: Date.now().toString(),
         client_id: clientId,
         content: newMessage.trim(),
-        role: "user",
+        role: "assistant",
         created_at: new Date().toISOString(),
         read: false,
       };
@@ -330,58 +316,81 @@ const Conversations: React.FC = () => {
       client.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Atualizar notificações quando uma mensagem é lida
+  const markMessagesAsRead = useCallback(async (clientId: string) => {
+    try {
+      console.log(`📖 Marcando mensagens como lidas para cliente: ${clientId}`);
+      
+      // Usar o novo endpoint otimizado
+      const result = await dashboardAPI.markClientMessagesAsRead(clientId);
+      
+      if (result.success && result.markedCount > 0) {
+        console.log(`✅ ${result.markedCount} mensagens marcadas como lidas`);
+        
+        // Invalidar cache local para recarregar mensagens atualizadas
+        messagesCache.current.delete(clientId);
+        
+        // Atualizar notificações após marcar como lidas
+        updateNotifications();
+      }
+    } catch (error) {
+      console.error('Erro ao marcar mensagens como lidas:', error);
+      // Fallback para o método antigo se o novo falhar
+      try {
+        const messages = await dashboardAPI.getMessages(clientId);
+        const unreadMessages = messages.filter(msg => msg.role === 'user' && !msg.read);
+        
+        if (unreadMessages.length > 0) {
+          await Promise.allSettled(
+            unreadMessages.map(async (msg) => {
+              try {
+                await dashboardAPI.markMessageAsRead(msg.id);
+              } catch (error) {
+                console.warn(`Erro ao marcar mensagem ${msg.id} como lida:`, error);
+              }
+            })
+          );
+          updateNotifications();
+        }
+      } catch (fallbackError) {
+        console.error('Erro no fallback para marcar mensagens como lidas:', fallbackError);
+      }
+    }
+  }, [updateNotifications]);
+
+  // Carregar mensagens quando o cliente é selecionado
+  useEffect(() => {
+    if (clientId) {
+      loadMessages();
+    }
+  }, [clientId]); // Apenas clientId como dependência
+
+  // Atualizar cliente selecionado quando clientId muda
+  useEffect(() => {
+    if (clientId && clients.length > 0) {
+      const client = clients.find(c => c.id === clientId);
+      if (client) {
+        setSelectedClient(client);
+      }
+    } else {
+      setSelectedClient(null);
+    }
+  }, [clientId, clients]);
+
+  // Marcar mensagens como lidas quando um cliente é selecionado
+  useEffect(() => {
+    if (selectedClient) {
+      markMessagesAsRead(selectedClient.id);
+    }
+  }, [selectedClient]);
+
   return (
     <Box sx={{ height: "100%" }}>
       <Typography variant="h4" sx={{ mb: 3, fontWeight: "bold" }}>
         Conversas
       </Typography>
 
-      {/* Debug Info - TEMPORÁRIO PARA TESTE */}
-      <Box sx={{ mb: 2, p: 2, bgcolor: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: 1 }}>
-        <Typography variant="h6" sx={{ color: '#d63031', mb: 1 }}>🔧 Debug Info:</Typography>
-        <Typography variant="body2">URL clientId: {clientId || 'NENHUM'}</Typography>
-        <Typography variant="body2">Selected Client: {selectedClient?.name || selectedClient?.phone || 'NENHUM'}</Typography>
-        <Typography variant="body2">Total Clients: {clients.length}</Typography>
-        <Typography variant="body2">Total Messages: {messages.length}</Typography>
-        <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-          <button onClick={() => loadClients()} style={{ padding: '4px 8px', fontSize: '12px' }}>
-            🔄 Recarregar Clientes
-          </button>
-          <button onClick={() => loadMessages()} style={{ padding: '4px 8px', fontSize: '12px' }}>
-            📨 Recarregar Mensagens
-          </button>
-          <button onClick={() => console.log('State:', { clientId, selectedClient, messages, clients })} style={{ padding: '4px 8px', fontSize: '12px' }}>
-            📋 Log State
-          </button>
-          <button 
-            onClick={async () => {
-              try {
-                console.log('🧹 Iniciando limpeza...');
-                const response = await fetch('/api/dashboard/cleanup/messages', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' }
-                });
-                const result = await response.json();
-                console.log('Resultado da limpeza:', result);
-                
-                if (result.success) {
-                  alert(`✅ Limpeza concluída!\n${result.message}\nRecarregue as mensagens para ver o resultado.`);
-                  // Automaticamente recarregar mensagens
-                  setTimeout(() => loadMessages(), 1000);
-                } else {
-                  alert(`❌ Erro na limpeza: ${result.error || 'Erro desconhecido'}`);
-                }
-              } catch (error) {
-                console.error('Erro na limpeza:', error);
-                alert('❌ Erro na limpeza. Verifique se o backend está rodando.');
-              }
-            }} 
-            style={{ padding: '4px 8px', fontSize: '12px', backgroundColor: '#ff6b6b', color: 'white' }}
-          >
-            🧹 Limpar Conversas
-          </button>
-        </Box>
-      </Box>
+
 
       <Grid container spacing={2} sx={{ height: "calc(100vh - 200px)" }}>
         {/* Lista de Clientes */}
@@ -425,9 +434,17 @@ const Conversations: React.FC = () => {
                   >
                     <ListItemAvatar>
                       <Badge
-                        badgeContent={client.unreadCount}
+                        badgeContent={notifications.clientUnreadCounts[client.id] || 0}
                         color="error"
                         overlap="circular"
+                        sx={{
+                          '& .MuiBadge-badge': {
+                            right: -3,
+                            top: 3,
+                            border: '2px solid #fff',
+                            padding: '0 4px',
+                          },
+                        }}
                       >
                         <Avatar sx={{ bgcolor: "#25D366" }}>
                           <PersonIcon />
@@ -449,10 +466,10 @@ const Conversations: React.FC = () => {
                           >
                             {client.name || client.phone}
                           </Typography>
-                          {client.unreadCount > 0 && (
+                          {notifications.clientUnreadCounts[client.id] > 0 && (
                             <Typography variant="caption" color="error">
-                              {client.unreadCount} nova
-                              {client.unreadCount !== 1 ? "s" : ""}
+                              {notifications.clientUnreadCounts[client.id]} nova
+                              {notifications.clientUnreadCounts[client.id] !== 1 ? "s" : ""}
                             </Typography>
                           )}
                         </Box>

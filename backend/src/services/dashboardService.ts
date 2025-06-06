@@ -68,13 +68,25 @@ export async function getAllClients(): Promise<Client[]> {
 
 // Obter histórico completo de uma conversa
 export async function getConversationHistory(
-  clientId: string
+  clientId: string,
+  limit?: number,
+  offset?: number
 ): Promise<Message[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("chat_messages")
-    .select("*")
+    .select("id, client_id, role, content, created_at") // Selecionar apenas campos necessários
     .eq("client_id", clientId)
     .order("created_at", { ascending: true });
+
+  // Adicionar paginação se especificado
+  if (limit) {
+    query = query.limit(limit);
+  }
+  if (offset) {
+    query = query.range(offset, offset + (limit || 100) - 1);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Erro ao buscar histórico:", error);
@@ -121,7 +133,7 @@ export async function sendMessageToClient(
   const { error: messageError } = await supabase.from("chat_messages").insert([
     {
       client_id: clientId,
-      role: "user",
+      role: "assistant",
       content: content,
     },
   ]);
@@ -243,7 +255,7 @@ export async function getPendingPlans(): Promise<PendingPlan[]> {
     console.error("Erro ao buscar planos pendentes:", error);
     throw error; // Propagar erro em vez de suprimir
   }
-  return data.map((plan) => ({
+  return data.map((plan: { id: string; client_id: string; clients: { phone: string }[]; plan_content: string; created_at: string; status: string }) => ({
     id: plan.id,
     client_id: plan.client_id,
     client_phone: plan.clients[0].phone,

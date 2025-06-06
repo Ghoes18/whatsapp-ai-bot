@@ -23,8 +23,65 @@ import {
   getMessageStatus,
   markMessageAsRead 
 } from './services/zapi';
+import rateLimit from 'express-rate-limit';
+
+// Cache simples em memória para melhorar performance
+const cache = new Map<string, { data: any, timestamp: number }>();
+const CACHE_DURATION = 30000; // 30 segundos
+
+function getCachedData(key: string) {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedData(key: string, data: any) {
+  cache.set(key, { data, timestamp: Date.now() });
+}
+
+function invalidateCache(pattern?: string) {
+  if (pattern) {
+    for (const [key] of cache) {
+      if (key.includes(pattern)) {
+        cache.delete(key);
+      }
+    }
+  } else {
+    cache.clear();
+  }
+}
 
 const router = express.Router();
+
+
+// Rate limiting para endpoints de mensagens
+const messageRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 10, // máximo 10 mensagens por minuto por IP
+  message: {
+    error: 'Muitas mensagens enviadas. Tente novamente em um minuto.',
+    retryAfter: 60
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiting para endpoints de media
+const mediaRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 5, // máximo 5 uploads de media por minuto por IP
+  message: {
+    error: 'Muitos uploads de media. Tente novamente em um minuto.',
+    retryAfter: 60
+  },
+});
+
+router.use('/clients/:clientId/messages', messageRateLimit);
+router.use('/clients/:clientId/image', mediaRateLimit);
+router.use('/clients/:clientId/document', mediaRateLimit);
+router.use('/clients/:clientId/audio', mediaRateLimit);
 
 // Obter estatísticas gerais do dashboard
 router.get('/stats', async (req, res) => {
@@ -51,7 +108,21 @@ router.get('/recent-activity', async (req, res) => {
 // Listar todos os clientes
 router.get('/clients', async (req, res) => {
   try {
+    const cacheKey = 'all_clients';
+    
+    // Verificar cache primeiro
+    const cachedClients = getCachedData(cacheKey);
+    if (cachedClients) {
+      console.log('👥 Retornando clientes do cache');
+      return res.json(cachedClients);
+    }
+    
+    console.log('👥 Buscando clientes no banco');
     const clients = await getAllClients();
+    
+    // Cachear resultado
+    setCachedData(cacheKey, clients);
+    
     res.json(clients);
   } catch (error) {
     console.error('Erro ao buscar clientes:', error);
@@ -92,7 +163,26 @@ router.get('/clients/:clientId/stats', async (req, res) => {
 router.get('/clients/:clientId/messages', async (req, res) => {
   try {
     const { clientId } = req.params;
-    const messages = await getConversationHistory(clientId);
+    const { limit, offset } = req.query;
+    const cacheKey = `messages_${clientId}_${limit || 'all'}_${offset || '0'}`;
+    
+    // Verificar cache primeiro
+    const cachedMessages = getCachedData(cacheKey);
+    if (cachedMessages) {
+      console.log(`📨 Retornando mensagens do cache para cliente: ${clientId}`);
+      return res.json(cachedMessages);
+    }
+    
+    console.log(`📨 Buscando mensagens no banco para cliente: ${clientId}`);
+    const messages = await getConversationHistory(
+      clientId, 
+      limit ? parseInt(limit as string) : undefined,
+      offset ? parseInt(offset as string) : undefined
+    );
+    
+    // Cachear resultado
+    setCachedData(cacheKey, messages);
+    
     res.json(messages);
   } catch (error) {
     console.error('Erro ao buscar mensagens:', error);
@@ -118,6 +208,10 @@ router.post('/clients/:clientId/messages', async (req, res) => {
 
     console.log('Chamando sendMessageToClient...');
     await sendMessageToClient(clientId, content);
+    
+    // Invalidar cache de mensagens deste cliente
+    invalidateCache(`messages_${clientId}`);
+    
     console.log('Mensagem enviada com sucesso!');
     res.json({ success: true });
   } catch (error) {
@@ -206,6 +300,52 @@ router.get('/messages/:messageId/status', async (req, res) => {
     res.json(status);
   } catch (error) {
     console.error('Erro ao verificar status da mensagem:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Marcar múltiplas mensagens como lidas (NOVO - otimizado)
+router.post('/clients/:clientId/messages/mark-read', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    
+    // Buscar mensagens não lidas do usuário
+    const { data: unreadMessages, error } = await supabase
+      .from('chat_messages')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('role', 'user')
+      .eq('read', false);
+    
+    if (error) {
+      console.error('Erro ao buscar mensagens não lidas:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+    
+    if (!unreadMessages || unreadMessages.length === 0) {
+      return res.json({ success: true, markedCount: 0 });
+    }
+    
+    // Marcar todas como lidas em uma operação
+    const { error: updateError } = await supabase
+      .from('chat_messages')
+      .update({ read: true })
+      .eq('client_id', clientId)
+      .eq('role', 'user')
+      .eq('read', false);
+    
+    if (updateError) {
+      console.error('Erro ao marcar mensagens como lidas:', updateError);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+    
+    // Invalidar cache de mensagens deste cliente
+    invalidateCache(`messages_${clientId}`);
+    
+    console.log(`✅ ${unreadMessages.length} mensagens marcadas como lidas para cliente ${clientId}`);
+    res.json({ success: true, markedCount: unreadMessages.length });
+  } catch (error) {
+    console.error('Erro ao marcar mensagens como lidas:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -358,7 +498,7 @@ router.post('/cleanup/messages', async (req, res) => {
       console.log('Exemplo de mensagem problemática:', problematicMessages[0]?.content?.substring(0, 200) + '...');
       
       // Deletar as mensagens problemáticas
-      const idsToDelete = problematicMessages.map(msg => msg.id);
+      const idsToDelete = problematicMessages.map((msg: { id: string }) => msg.id);
       
       const { error: deleteError } = await supabase
         .from('chat_messages')
@@ -412,5 +552,21 @@ router.post('/debug/webhook', async (req, res) => {
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
+
+if (process.env.NODE_ENV !== 'production') {
+  console.log('⚠️  Endpoints de debug habilitados (apenas em desenvolvimento)');
+} else {
+  // Remover rotas temporárias em produção
+  console.log('🔒 Endpoints de debug desabilitados em produção');
+  
+  // Substituir por handlers que retornam 404
+  router.post('/cleanup/messages', (req, res) => {
+    res.status(404).json({ error: 'Endpoint não disponível em produção' });
+  });
+  
+  router.post('/debug/webhook', (req, res) => {
+    res.status(404).json({ error: 'Endpoint não disponível em produção' });
+  });
+}
 
 export default router; 
