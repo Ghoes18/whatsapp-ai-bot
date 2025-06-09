@@ -1,31 +1,37 @@
 import React, { useState, useEffect } from "react";
-import {
-  Box,
-  Grid,
-  Paper,
-  Typography,
-  Card,
-  CardContent,
-  CardActions,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Chip,
-  Avatar,
-  Divider,
-} from "@mui/material";
-import {
-  Edit as EditIcon,
-  Check as ApproveIcon,
-  Close as RejectIcon,
-  Schedule as ScheduleIcon,
-  FitnessCenter as FitnessCenterIcon,
-} from "@mui/icons-material";
 import { dashboardAPI } from '../services/api';
 import type { PendingPlan } from '../services/api';
+
+// Simple SVG Icons
+const EditIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
+
+const ApproveIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const RejectIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
+const ScheduleIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+const FitnessCenterIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7h18zm-3-9v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2h12z" />
+  </svg>
+);
 
 const PendingPlans: React.FC = () => {
   const [pendingPlans, setPendingPlans] = useState<PendingPlan[]>([]);
@@ -92,209 +98,191 @@ const PendingPlans: React.FC = () => {
     });
   };
 
-  const getplanType = (content: string) => {
+  const getPlanType = (content: string) => {
     if (
       content.toLowerCase().includes("treino") ||
       content.toLowerCase().includes("exercício")
     ) {
-      return { type: "Treino", icon: <FitnessCenterIcon />, color: "#2196F3" };
+      return { 
+        type: "Treino", 
+        icon: FitnessCenterIcon, 
+        color: "text-blue-600",
+        bgColor: "bg-blue-100"
+      };
     }
     if (
       content.toLowerCase().includes("nutricional") ||
       content.toLowerCase().includes("alimentação")
     ) {
-      return { type: "Nutrição", icon: <ScheduleIcon />, color: "#4CAF50" };
+      return { 
+        type: "Nutrição", 
+        icon: ScheduleIcon, 
+        color: "text-green-600",
+        bgColor: "bg-green-100"
+      };
     }
-    return { type: "Plano", icon: <ScheduleIcon />, color: "#FF9800" };
+    return { 
+      type: "Plano", 
+      icon: ScheduleIcon, 
+      color: "text-orange-600",
+      bgColor: "bg-orange-100"
+    };
   };
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <Typography variant="h6">Carregando planos pendentes...</Typography>
-      </Box>
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando planos pendentes...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box>
-      <Typography variant="h4" sx={{ mb: 4, fontWeight: "bold" }}>
-        Planos Pendentes de Aprovação
-      </Typography>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Planos Pendentes de Aprovação</h1>
+        <button 
+          onClick={loadPendingPlans}
+          className="btn-secondary flex items-center space-x-2"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Atualizar</span>
+        </button>
+      </div>
 
       {!Array.isArray(pendingPlans) || pendingPlans.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: "center" }}>
-          <Typography variant="h6" color="text.secondary">
+        <div className="card text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ScheduleIcon className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
             Nenhum plano pendente de aprovação
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          </h3>
+          <p className="text-gray-500">
             Todos os planos gerados pela IA foram revisados.
-          </Typography>
-        </Paper>
+          </p>
+        </div>
       ) : (
-        <Grid container spacing={3}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pendingPlans.map((plan) => {
-            const planInfo = getplanType(plan.plan_content);
+            const planInfo = getPlanType(plan.plan_content);
+            const Icon = planInfo.icon;
             const isProcessing = processingPlanId === plan.id;
+            
             return (
-              <Grid item xs={12} md={6} lg={4} key={plan.id}>
-                <Card
-                  sx={{
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                    "&:hover": {
-                      transform: "translateY(-4px)",
-                      boxShadow: 4,
-                    },
-                  }}
-                >
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <Avatar sx={{ bgcolor: planInfo.color, mr: 2 }}>
-                        {planInfo.icon}
-                      </Avatar>
-                      <Box sx={{ flexGrow: 1 }}>
-                        <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                          {planInfo.type}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {plan.client_phone}
-                        </Typography>
-                      </Box>
-                      <Chip label="Pendente" color="warning" size="small" />
-                    </Box>
+              <div
+                key={plan.id}
+                className="card hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className="flex items-center mb-4">
+                  <div className={`w-10 h-10 ${planInfo.bgColor} rounded-full flex items-center justify-center mr-3`}>
+                    <Icon className={`h-5 w-5 ${planInfo.color}`} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {planInfo.type}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {plan.client_phone}
+                    </p>
+                  </div>
+                  <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                    Pendente
+                  </span>
+                </div>
 
-                    <Divider sx={{ mb: 2 }} />
+                <div className="border-t border-gray-200 pt-4 mb-4">
+                  <p className="text-sm text-gray-700 line-clamp-6 mb-4">
+                    {plan.plan_content}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Criado em: {formatDate(plan.created_at)}
+                  </p>
+                </div>
 
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        display: "-webkit-box",
-                        WebkitLineClamp: 6,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        lineHeight: 1.5,
-                        mb: 2,
-                      }}
-                    >
-                      {plan.plan_content}
-                    </Typography>
-
-                    <Typography variant="caption" color="text.secondary">
-                      Criado em: {formatDate(plan.created_at)}
-                    </Typography>
-                  </CardContent>
-
-                  <CardActions sx={{ p: 2, pt: 0 }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<EditIcon />}
-                      onClick={() => openEditModal(plan)}
-                      sx={{ mr: 1 }}
-                      disabled={isProcessing}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      color="success"
-                      startIcon={<ApproveIcon />}
-                      onClick={() => {
-                        setSelectedPlan(plan);
-                        setEditedContent(plan.plan_content);
-                        handleReview("approved");
-                      }}
-                      sx={{ mr: 1 }}
-                      disabled={isProcessing}
-                    >
-                      {isProcessing ? "Processando..." : "Aprovar"}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      color="error"
-                      startIcon={<RejectIcon />}
-                      onClick={() => {
-                        setSelectedPlan(plan);
-                        handleReview("rejected");
-                      }}
-                      disabled={isProcessing}
-                    >
-                      {isProcessing ? "Processando..." : "Rejeitar"}
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => openEditModal(plan)}
+                    disabled={isProcessing}
+                    className="flex-1 btn-secondary text-sm flex items-center justify-center space-x-1"
+                  >
+                    <EditIcon className="h-4 w-4" />
+                    <span>Editar</span>
+                  </button>
+                  <button
+                    onClick={() => handleReview("approved")}
+                    disabled={isProcessing}
+                    className="flex-1 btn-primary text-sm flex items-center justify-center space-x-1"
+                  >
+                    <ApproveIcon className="h-4 w-4" />
+                    <span>Aprovar</span>
+                  </button>
+                  <button
+                    onClick={() => handleReview("rejected")}
+                    disabled={isProcessing}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 text-sm flex items-center justify-center space-x-1 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    <RejectIcon className="h-4 w-4" />
+                    <span>Rejeitar</span>
+                  </button>
+                </div>
+              </div>
             );
           })}
-        </Grid>
+        </div>
       )}
 
       {/* Modal de Edição */}
-      <Dialog
-        open={isEditModalOpen}
-        onClose={() => !processingPlanId && setIsEditModalOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <EditIcon />
-            <Typography variant="h6">Editar Plano</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              Cliente: {selectedPlan?.client_phone}
-            </Typography>
-          </Box>
-          <TextField
-            fullWidth
-            multiline
-            rows={20}
-            value={editedContent}
-            onChange={(e) => setEditedContent(e.target.value)}
-            variant="outlined"
-            placeholder="Edite o conteúdo do plano..."
-            sx={{ mb: 2 }}
-            disabled={!!processingPlanId}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => setIsEditModalOpen(false)}
-            disabled={!!processingPlanId}
-          >
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            startIcon={<RejectIcon />}
-            onClick={() => handleReview("rejected")}
-            sx={{ mr: 1 }}
-            disabled={!!processingPlanId}
-          >
-            {processingPlanId ? "Processando..." : "Rejeitar"}
-          </Button>
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<ApproveIcon />}
-            onClick={() => handleReview("approved")}
-            disabled={!!processingPlanId}
-          >
-            {processingPlanId ? "Processando..." : "Aprovar e Enviar"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      {isEditModalOpen && selectedPlan && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Editar Plano
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Cliente: {selectedPlan.client_phone}
+              </p>
+            </div>
+            
+            <div className="p-6 flex-1 overflow-y-auto">
+              <textarea
+                value={editedContent}
+                onChange={(e) => setEditedContent(e.target.value)}
+                className="w-full h-64 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                placeholder="Conteúdo do plano..."
+              />
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleReview("approved")}
+                disabled={processingPlanId === selectedPlan.id}
+                className="btn-primary flex items-center space-x-2"
+              >
+                {processingPlanId === selectedPlan.id ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <ApproveIcon className="h-4 w-4" />
+                )}
+                <span>Aprovar com Edições</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

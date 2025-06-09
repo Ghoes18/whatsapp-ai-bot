@@ -1,49 +1,68 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  Box,
-  Grid,
-  Paper,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  Avatar,
-  Typography,
-  TextField,
-  IconButton,
-  Switch,
-  FormControlLabel,
-  InputAdornment,
-  ListItemButton,
-  Badge,
-  Tooltip,
-  CircularProgress,
-} from "@mui/material";
-import {
-  Send as SendIcon,
-  SmartToy as AIIcon,
-  Person as PersonIcon,
-  Search as SearchIcon,
-  Circle as OnlineIcon,
-  Check as CheckIcon,
-  AttachFile as AttachFileIcon,
-  Image as ImageIcon,
-  Mic as MicIcon,
-} from "@mui/icons-material";
 import { dashboardAPI } from "../services/api";
 import type { Client, Message } from "../services/api";
 import { useNotifications } from '../hooks/useNotifications';
 
-// interface MessageStatus {
-//   delivered: boolean;
-//   read: boolean;
-// }
+// Simple SVG Icons
+const SendIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+  </svg>
+);
+
+const AIIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+  </svg>
+);
+
+const PersonIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
+const SearchIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+const CheckIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const AttachFileIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+  </svg>
+);
+
+const ImageIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+const MicIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+  </svg>
+);
+
+const ChatIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+  </svg>
+);
 
 const Conversations: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const { notifications, updateNotifications } = useNotifications();
+  const { updateNotifications } = useNotifications();
   
   // Estados principais
   const [clients, setClients] = useState<Client[]>([]);
@@ -59,7 +78,6 @@ const Conversations: React.FC = () => {
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const markReadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkedReadRef = useRef<string | null>(null);
@@ -198,534 +216,321 @@ const Conversations: React.FC = () => {
     // Aguardar 2 segundos antes de marcar como lido (debounce aumentado)
     markReadTimeoutRef.current = setTimeout(async () => {
       try {
-        // Verificar se ainda estamos no mesmo cliente
-        if (targetClientId !== clientId) {
-          console.log('⚠️ Cliente mudou durante debounce, ignorando marcação como lido');
-          return;
-        }
-
         console.log(`📖 Marcando mensagens como lidas para cliente: ${targetClientId}`);
-        const result = await dashboardAPI.markClientMessagesAsRead(targetClientId);
+        await dashboardAPI.markClientMessagesAsRead(targetClientId);
         
-        if (result.success && result.markedCount > 0) {
-          console.log(`✅ ${result.markedCount} mensagens marcadas como lidas`);
-          
-          // Em vez de recarregar (loadMessages), atualizamos o estado local
-          setMessages(prev => prev.map(m => ({ ...m, read: true })));
-          
-          // Atualizar notificações
-          updateNotifications();
-        }
+        // Atualizar notificações
+        updateNotifications();
+        
+        console.log('✅ Mensagens marcadas como lidas');
       } catch (error) {
-        console.error('Erro ao marcar mensagens como lidas:', error);
+        console.error('❌ Erro ao marcar mensagens como lidas:', error);
       } finally {
-        // Limpar referência após processamento
         lastMarkedReadRef.current = null;
       }
-    }, 2000); // Aumentado para 2 segundos
-  }, [clientId, updateNotifications]);
+    }, 2000);
+  }, [updateNotifications]);
 
-  // EFEITO PRINCIPAL: Gerencia mudanças de clientId
-  useEffect(() => {
-    console.log('🔄 ClientId changed:', { clientId, clientsLoaded: !isLoadingClients });
-    
-    if (!clientId) {
-      // Sem cliente selecionado - limpar estado
-      clearMessagesState();
-      return;
-    }
-
-    // Limpar estado anterior imediatamente
-    clearMessagesState();
-    
-    // Se os clientes ainda não foram carregados, aguardar
-    if (isLoadingClients) {
-      console.log('⏳ Aguardando clientes carregarem...');
-      return;
-    }
-
-    // Encontrar o cliente na lista
-    const client = clients.find(c => c.id === clientId);
-    if (!client) {
-      console.warn(`❌ Cliente ${clientId} não encontrado na lista`);
-      return;
-    }
-
-    console.log(`✅ Cliente encontrado: ${client.name || client.phone}`);
-    setSelectedClient(client);
-    
-    // Carregar mensagens (agora com cache)
-    loadMessages(clientId);
-    
-    // Marcar mensagens como lidas (com debounce mais robusto)
-    markMessagesAsRead(clientId);
-    
-  }, [clientId, isLoadingClients, clearMessagesState, loadMessages, markMessagesAsRead]);
-
-  // Efeito para carregar clientes no início
+  // Carregar dados quando o componente monta
   useEffect(() => {
     loadClients();
   }, [loadClients]);
 
-  // Efeito para scroll automático
+  // Carregar mensagens quando o clientId muda
   useEffect(() => {
-    if (messages.length > 0) {
-      scrollToBottom();
+    if (clientId) {
+      const client = clients.find(c => c.id === clientId);
+      if (client) {
+        setSelectedClient(client);
+        loadMessages(clientId);
+        markMessagesAsRead(clientId);
+      }
+    } else {
+      clearMessagesState();
     }
-  }, [messages]);
+  }, [clientId, clients, loadMessages, markMessagesAsRead, clearMessagesState]);
 
-  // Cleanup na desmontagem
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      if (markReadTimeoutRef.current) {
-        clearTimeout(markReadTimeoutRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      // Limpar cache
-      messagesCacheRef.current = {};
-    };
-  }, []);
-
-  // Funções auxiliares
+  // Função para rolar para baixo
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Função para formatar hora
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
     });
   };
 
   // Função para enviar mensagem
-  const handleSendMessage = useCallback(async () => {
-    if (!newMessage.trim() || !clientId || !selectedClient || isSendingMessage) {
-      return;
-    }
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedClient || isSendingMessage) return;
 
+    const messageToSend = newMessage.trim();
+    setNewMessage("");
     setIsSendingMessage(true);
-    console.log('🚀 Enviando mensagem:', newMessage.trim());
 
     try {
-      await dashboardAPI.sendMessage(clientId, newMessage.trim());
+      console.log(`📤 Enviando mensagem para ${selectedClient.name}: ${messageToSend}`);
       
-      // Adicionar mensagem local imediatamente
+      const response = await dashboardAPI.sendMessage(selectedClient.id, messageToSend);
+      console.log('✅ Mensagem enviada:', response);
+
+      // Adicionar mensagem à lista local
       const newMsg: Message = {
-        id: Date.now().toString(),
-        client_id: clientId,
-        content: newMessage.trim(),
-        role: "assistant",
+        id: `temp-${Date.now()}`,
+        content: messageToSend,
+        role: 'assistant',
         created_at: new Date().toISOString(),
-        read: false,
+        client_id: selectedClient.id
       };
-      
+
       setMessages(prev => [...prev, newMsg]);
-      setNewMessage("");
-      console.log('✅ Mensagem enviada com sucesso');
+      
+      // Rolar para baixo
+      setTimeout(() => scrollToBottom(), 100);
+      
     } catch (error) {
-      console.error("❌ Erro ao enviar mensagem:", error);
-      alert(`Erro ao enviar mensagem: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      console.error('❌ Erro ao enviar mensagem:', error);
+      // Restaurar mensagem em caso de erro
+      setNewMessage(messageToSend);
     } finally {
       setIsSendingMessage(false);
     }
-  }, [newMessage, clientId, selectedClient, isSendingMessage]);
-
-  // Função para alternar IA
-  const toggleAI = useCallback(async (targetClientId: string) => {
-    try {
-      const response = await dashboardAPI.toggleAI(targetClientId);
-
-      setClients(prev =>
-        prev.map(client =>
-          client.id === targetClientId
-            ? { ...client, ai_enabled: response.ai_enabled }
-            : client
-        )
-      );
-
-      if (selectedClient?.id === targetClientId) {
-        setSelectedClient(prev =>
-          prev ? { ...prev, ai_enabled: response.ai_enabled } : null
-        );
-      }
-    } catch (error) {
-      console.error("Erro ao alternar IA:", error);
-    }
-  }, [selectedClient]);
-
-  // Função para digitação
-  const handleTyping = useCallback(async (isTyping: boolean) => {
-    if (!selectedClient) return;
-    try {
-      await dashboardAPI.sendTyping(selectedClient.id, isTyping);
-    } catch (error) {
-      console.error("Erro ao enviar status de digitação:", error);
-    }
-  }, [selectedClient]);
-
-  const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewMessage(e.target.value);
-
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    handleTyping(true);
-
-    typingTimeoutRef.current = setTimeout(() => {
-      handleTyping(false);
-    }, 2000);
   };
 
-  // Clientes filtrados
-  const filteredClients = clients.filter(
-    (client) =>
-      client.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Função para lidar com mudança na mensagem
+  const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+  };
+
+  // Função para lidar com Enter
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  // Filtrar clientes baseado na busca
+  const filteredClients = clients.filter(client =>
+    client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.phone?.includes(searchTerm)
   );
 
+  if (isLoadingClients) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-12 h-12 mx-auto mb-4 border-b-2 rounded-full animate-spin border-primary-600"></div>
+          <p className="text-gray-600">Carregando conversas...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Box sx={{ height: "100%" }}>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: "bold" }}>
-        Conversas
-      </Typography>
+    <div className="flex h-full bg-gray-50">
+      {/* Lista de Clientes */}
+      <div className="flex flex-col w-full bg-white border-r border-gray-200 lg:w-80">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="mb-4 text-xl font-semibold text-gray-900">Conversas</h2>
+          
+          {/* Barra de Busca */}
+          <div className="relative">
+            <SearchIcon className="absolute w-5 h-5 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar clientes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+        </div>
 
-      <Grid container spacing={2} sx={{ height: "calc(100vh - 200px)" }}>
         {/* Lista de Clientes */}
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-            <Box sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}>
-              <TextField
-                fullWidth
-                placeholder="Buscar cliente..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                size="small"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
+        <div className="flex-1 overflow-y-auto">
+          {filteredClients.length > 0 ? (
+            <div className="divide-y divide-gray-200">
+              {filteredClients.map((client) => (
+                <div
+                  key={client.id}
+                  onClick={() => navigate(`/conversations/${client.id}`)}
+                  className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
+                    clientId === client.id ? 'bg-primary-50 border-r-2 border-primary-500' : ''
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100">
+                        <PersonIcon className="w-6 h-6 text-primary-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {client.name ?? 'Cliente'}
+                        </p>
+                      </div>
+                      <p className="text-sm text-gray-500 truncate">
+                        {client.phone ?? 'Sem telefone'}
+                      </p>
+                      {client.last_message_at && (
+                        <p className="mt-1 text-xs text-gray-400 truncate">
+                          Última mensagem: {formatTime(client.last_message_at)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
+                <PersonIcon className="w-8 h-8 text-gray-400" />
+              </div>
+              <p className="text-gray-500">Nenhum cliente encontrado</p>
+            </div>
+          )}
+        </div>
+      </div>
 
-            <List sx={{ flexGrow: 1, overflow: "auto", p: 0 }}>
-              {isLoadingClients ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                  <CircularProgress />
-                </Box>
-              ) : filteredClients.length === 0 ? (
-                <Box sx={{ p: 3, textAlign: 'center' }}>
-                  <Typography color="text.secondary">
-                    Nenhum cliente encontrado
-                  </Typography>
-                </Box>
-              ) : (
-                filteredClients.map((client) => (
-                  <ListItem key={client.id} disablePadding>
-                    <ListItemButton
-                      onClick={() => {
-                        console.log('🔄 Cliente clicado:', client.id);
-                        navigate(`/conversations/${client.id}`);
-                      }}
-                      selected={selectedClient?.id === client.id}
-                      sx={{
-                        borderBottom: 1,
-                        borderColor: "divider",
-                        "&.Mui-selected": {
-                          backgroundColor: "#e8f5e8",
-                        },
-                      }}
+      {/* Área de Mensagens */}
+      <div className="flex flex-col flex-1">
+        {selectedClient ? (
+          <>
+            {/* Header da Conversa */}
+            <div className="p-4 bg-white border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="relative">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary-100">
+                    <PersonIcon className="w-5 h-5 text-primary-600" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {selectedClient.name ?? 'Cliente'}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {selectedClient.phone ?? 'Sem telefone'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Mensagens */}
+            <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+              {isLoadingMessages ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="w-8 h-8 border-b-2 rounded-full animate-spin border-primary-600"></div>
+                </div>
+              ) : messages.length > 0 ? (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.role === 'assistant' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        message.role === 'assistant'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-200 text-gray-900'
+                      }`}
                     >
-                      <ListItemAvatar>
-                        <Badge
-                          badgeContent={notifications.clientUnreadCounts[client.id] || 0}
-                          color="error"
-                          overlap="circular"
-                          sx={{
-                            '& .MuiBadge-badge': {
-                              right: -3,
-                              top: 3,
-                              border: '2px solid #fff',
-                              padding: '0 4px',
-                            },
-                          }}
-                        >
-                          <Avatar sx={{ bgcolor: "#25D366" }}>
-                            <PersonIcon />
-                          </Avatar>
-                        </Badge>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-                              {client.name || client.phone}
-                            </Typography>
-                            {notifications.clientUnreadCounts[client.id] > 0 && (
-                              <Typography variant="caption" color="error">
-                                {notifications.clientUnreadCounts[client.id]} nova
-                                {notifications.clientUnreadCounts[client.id] !== 1 ? "s" : ""}
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                        secondary={
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              mt: 0.5,
-                            }}
-                          >
-                            <Typography variant="body2" color="text.secondary" component="div">
-                              {client.phone}
-                            </Typography>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <OnlineIcon
-                                sx={{
-                                  fontSize: 12,
-                                  color: client.ai_enabled ? "#4CAF50" : "#9E9E9E",
-                                }}
-                              />
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                component="div"
-                              >
-                                {client.ai_enabled ? "IA Ativa" : "IA Pausada"}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        }
-                      />
-                    </ListItemButton>
-                  </ListItem>
+                      <p className="text-sm">{message.content}</p>
+                      <div className={`flex items-center justify-end mt-1 ${
+                        message.role === 'assistant' ? 'text-primary-100' : 'text-gray-500'
+                      }`}>
+                        <span className="text-xs">{formatTime(message.created_at)}</span>
+                        {message.role === 'assistant' && (
+                          <CheckIcon className="w-3 h-3 ml-1" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 ))
+              ) : (
+                <div className="py-8 text-center">
+                  <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
+                    <AIIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500">Nenhuma mensagem ainda</p>
+                  <p className="mt-1 text-sm text-gray-400">Inicie uma conversa!</p>
+                </div>
               )}
-            </List>
-          </Paper>
-        </Grid>
+              <div ref={messagesEndRef} />
+            </div>
 
-        {/* Chat Interface */}
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-            {selectedClient ? (
-              <>
-                {/* Header do Chat */}
-                <Box
-                  sx={{
-                    p: 2,
-                    borderBottom: 1,
-                    borderColor: "divider",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
+            {/* Input de Mensagem */}
+            <div className="p-4 bg-white border-t border-gray-200">
+              <div className="flex items-center space-x-2">
+                <button 
+                  className="p-2 text-gray-400 transition-colors hover:text-gray-600"
+                  title="Anexar arquivo"
+                  aria-label="Anexar arquivo"
                 >
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Badge
-                      overlap="circular"
-                      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                      badgeContent={
-                        <Tooltip title={selectedClient.isTyping ? "Digitando..." : "Online"}>
-                          <OnlineIcon
-                            sx={{
-                              fontSize: 12,
-                              color: selectedClient.isTyping ? "#FFA726" : "#4CAF50",
-                            }}
-                          />
-                        </Tooltip>
-                      }
-                    >
-                      <Avatar sx={{ bgcolor: "#25D366" }}>
-                        <PersonIcon />
-                      </Avatar>
-                    </Badge>
-                    <Box>
-                      <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                        {selectedClient.name || selectedClient.phone}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {selectedClient.isTyping ? "Digitando..." : selectedClient.phone}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={selectedClient.ai_enabled}
-                        onChange={() => toggleAI(selectedClient.id)}
-                        color="primary"
-                      />
-                    }
-                    label={
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <AIIcon />
-                        <Typography variant="body2">
-                          IA {selectedClient.ai_enabled ? "Ativa" : "Pausada"}
-                        </Typography>
-                      </Box>
-                    }
+                  <AttachFileIcon className="w-5 h-5" />
+                </button>
+                <button 
+                  className="p-2 text-gray-400 transition-colors hover:text-gray-600"
+                  title="Enviar imagem"
+                  aria-label="Enviar imagem"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={handleMessageChange}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Digite sua mensagem..."
+                    disabled={isSendingMessage}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
                   />
-                </Box>
-
-                {/* Mensagens */}
-                <Box
-                  sx={{
-                    flexGrow: 1,
-                    overflow: "auto",
-                    p: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 1,
-                  }}
+                </div>
+                <button 
+                  className="p-2 text-gray-400 transition-colors hover:text-gray-600"
+                  title="Gravar áudio"
+                  aria-label="Gravar áudio"
                 >
-                  {isLoadingMessages ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                      <CircularProgress />
-                      <Typography sx={{ ml: 2 }}>Carregando mensagens...</Typography>
-                    </Box>
-                  ) : messages.length === 0 ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                      <Typography color="text.secondary">
-                        Nenhuma mensagem ainda. Inicie a conversa!
-                      </Typography>
-                    </Box>
+                  <MicIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || isSendingMessage}
+                  className="p-2 text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  title="Enviar mensagem"
+                  aria-label="Enviar mensagem"
+                >
+                  {isSendingMessage ? (
+                    <div className="w-5 h-5 border-b-2 border-white rounded-full animate-spin"></div>
                   ) : (
-                    messages.map((message) => (
-                      <Box
-                        key={message.id}
-                        sx={{
-                          display: "flex",
-                          justifyContent: message.role === "user" ? "flex-start" : "flex-end",
-                          mb: 1,
-                        }}
-                      >
-                        <Paper
-                          sx={{
-                            p: 2,
-                            maxWidth: "70%",
-                            backgroundColor: message.role === "user" ? "#f5f5f5" : "#25D366",
-                            color: message.role === "user" ? "text.primary" : "white",
-                          }}
-                        >
-                          <Typography variant="body1">{message.content}</Typography>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "flex-end",
-                              gap: 0.5,
-                              mt: 0.5,
-                            }}
-                          >
-                            <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                              {formatTime(message.created_at)}
-                            </Typography>
-                            {message.role === "assistant" && (
-                              <Tooltip title="Enviada">
-                                <CheckIcon sx={{ fontSize: 16, color: "#9E9E9E" }} />
-                              </Tooltip>
-                            )}
-                          </Box>
-                        </Paper>
-                      </Box>
-                    ))
+                    <SendIcon className="w-5 h-5" />
                   )}
-                  <div ref={messagesEndRef} />
-                </Box>
-
-                {/* Input de Mensagem */}
-                <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
-                  <Box sx={{ display: "flex", gap: 1 }}>
-                    <Box sx={{ display: "flex", gap: 1 }}>
-                      <Tooltip title="Anexar arquivo">
-                        <IconButton>
-                          <AttachFileIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Enviar imagem">
-                        <IconButton>
-                          <ImageIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Gravar áudio">
-                        <IconButton>
-                          <MicIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                    <TextField
-                      fullWidth
-                      placeholder="Digite sua mensagem..."
-                      value={newMessage}
-                      onChange={handleMessageChange}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      multiline
-                      maxRows={3}
-                      disabled={isSendingMessage}
-                    />
-                    <IconButton
-                      onClick={handleSendMessage}
-                      disabled={!newMessage.trim() || isSendingMessage}
-                      sx={{
-                        bgcolor: "#25D366",
-                        color: "white",
-                        "&:hover": { bgcolor: "#128C7E" },
-                        "&:disabled": { bgcolor: "#ccc" },
-                      }}
-                    >
-                      {isSendingMessage ? <CircularProgress size={24} /> : <SendIcon />}
-                    </IconButton>
-                  </Box>
-                </Box>
-              </>
-            ) : (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                }}
-              >
-                <Typography variant="h6" color="text.secondary">
-                  {isLoadingClients ? "Carregando..." : "Selecione uma conversa para começar"}
-                </Typography>
-              </Box>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-    </Box>
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-center flex-1">
+            <div className="text-center">
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
+                <ChatIcon className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-gray-900">Selecione uma conversa</h3>
+              <p className="text-gray-500">Escolha um cliente para começar a conversar</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
-export default Conversations;
+export default Conversations; 
