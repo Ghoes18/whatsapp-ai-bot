@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { dashboardAPI } from '../services/api';
 
 interface NotificationState {
@@ -14,44 +14,30 @@ export function useNotifications() {
     clientUnreadCounts: {},
   });
 
-  const updateNotifications = async () => {
+  const updateNotifications = useCallback(async () => {
     try {
-      // Buscar estatísticas do dashboard
-      const stats = await dashboardAPI.getDashboardStats();
+      // Buscar estatísticas do dashboard e contagens de mensagens não lidas em uma única chamada
+      const [stats, unreadCounts] = await Promise.all([
+        dashboardAPI.getDashboardStats(),
+        dashboardAPI.getUnreadMessageCounts()
+      ]);
       
-      // Buscar clientes com mensagens não lidas
-      const clients = await dashboardAPI.getClients();
-      const clientUnreadCounts: { [clientId: string]: number } = {};
-      
-      // Para cada cliente, buscar mensagens não lidas
-      await Promise.all(
-        clients.map(async (client) => {
-          const messages = await dashboardAPI.getMessages(client.id);
-          const unreadCount = messages.filter(
-            (msg) => msg.role === 'user' && !msg.read
-          ).length;
-          if (unreadCount > 0) {
-            clientUnreadCounts[client.id] = unreadCount;
-          }
-        })
-      );
-
       setNotifications({
         unreadMessages: stats.activeConversations,
         pendingPlans: stats.pendingPlans,
-        clientUnreadCounts,
+        clientUnreadCounts: unreadCounts,
       });
     } catch (error) {
       console.error('Erro ao atualizar notificações:', error);
     }
-  };
+  }, []);
 
   // Atualizar notificações a cada 30 segundos
   useEffect(() => {
     updateNotifications();
     const interval = setInterval(updateNotifications, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [updateNotifications]);
 
   return {
     notifications,

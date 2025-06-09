@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabase } from './services/supabaseService';
+import { supabase } from './src/services/supabaseService';
 import {
   getAllClients,
   getConversationHistory,
@@ -13,7 +13,7 @@ import {
   getClientStats,
   getDashboardStats,
   getRecentActivity
-} from './services/dashboardService';
+} from './src/services/dashboardService';
 import { 
   sendWhatsappMessage, 
   sendImage, 
@@ -22,7 +22,7 @@ import {
   sendTyping, 
   getMessageStatus,
   markMessageAsRead 
-} from './services/zapi';
+} from './src/services/zapi';
 import rateLimit from 'express-rate-limit';
 
 // Cache simples em memória para melhorar performance
@@ -304,46 +304,31 @@ router.get('/messages/:messageId/status', async (req, res) => {
   }
 });
 
-// Marcar múltiplas mensagens como lidas (NOVO - otimizado)
+// Marcar múltiplas mensagens como lidas (NOVO - otimizado com função da DB)
 router.post('/clients/:clientId/messages/mark-read', async (req, res) => {
   try {
     const { clientId } = req.params;
     
-    // Buscar mensagens não lidas do usuário
-    const { data: unreadMessages, error } = await supabase
-      .from('chat_messages')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('role', 'user')
-      .eq('read', false);
+    // Usar função otimizada da base de dados para batch operation
+    const { data, error } = await supabase.rpc('mark_client_messages_read', {
+      p_client_id: clientId
+    });
     
     if (error) {
-      console.error('Erro ao buscar mensagens não lidas:', error);
+      console.error('Erro ao marcar mensagens como lidas:', error);
       return res.status(500).json({ error: 'Erro interno do servidor' });
     }
     
-    if (!unreadMessages || unreadMessages.length === 0) {
-      return res.json({ success: true, markedCount: 0 });
-    }
-    
-    // Marcar todas como lidas em uma operação
-    const { error: updateError } = await supabase
-      .from('chat_messages')
-      .update({ read: true })
-      .eq('client_id', clientId)
-      .eq('role', 'user')
-      .eq('read', false);
-    
-    if (updateError) {
-      console.error('Erro ao marcar mensagens como lidas:', updateError);
-      return res.status(500).json({ error: 'Erro interno do servidor' });
-    }
+    const result = Array.isArray(data) ? data[0] : data;
     
     // Invalidar cache de mensagens deste cliente
     invalidateCache(`messages_${clientId}`);
     
-    console.log(`✅ ${unreadMessages.length} mensagens marcadas como lidas para cliente ${clientId}`);
-    res.json({ success: true, markedCount: unreadMessages.length });
+    console.log(`✅ ${result?.marked_count || 0} mensagens marcadas como lidas para cliente ${clientId}`);
+    res.json({ 
+      success: result?.success || true, 
+      markedCount: result?.marked_count || 0 
+    });
   } catch (error) {
     console.error('Erro ao marcar mensagens como lidas:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -452,6 +437,77 @@ router.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Performance test endpoint
+router.get('/performance-test/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const startTime = Date.now();
+    
+    console.log(`🧪 Iniciando teste de performance para cliente: ${clientId}`);
+    
+    // Teste 1: Buscar cliente
+    const clientStart = Date.now();
+    const client = await getClientById(clientId);
+    const clientTime = Date.now() - clientStart;
+    
+    if (!client) {
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+    
+    // Teste 2: Buscar mensagens
+    const messagesStart = Date.now();
+    const messages = await getConversationHistory(clientId);
+    const messagesTime = Date.now() - messagesStart;
+    
+    // Teste 3: Marcar como lidas (simulação)
+    const markReadStart = Date.now();
+    const { data: markResult } = await supabase.rpc('mark_client_messages_read', {
+      p_client_id: clientId
+    });
+    const markReadTime = Date.now() - markReadStart;
+    
+    const totalTime = Date.now() - startTime;
+    
+    const results = {
+      success: true,
+      totalTime: `${totalTime}ms`,
+      tests: {
+        getClient: {
+          time: `${clientTime}ms`,
+          success: !!client,
+          data: { name: client.name, phone: client.phone }
+        },
+        getMessages: {
+          time: `${messagesTime}ms`,
+          success: true,
+          count: messages.length
+        },
+        markAsRead: {
+          time: `${markReadTime}ms`,
+          success: !!markResult,
+          markedCount: markResult?.marked_count || 0
+        }
+      },
+      performance: {
+        excellent: totalTime < 100,
+        good: totalTime < 300,
+        acceptable: totalTime < 500,
+        poor: totalTime >= 500
+      }
+    };
+    
+    console.log(`🧪 Teste de performance concluído em ${totalTime}ms`);
+    res.json(results);
+    
+  } catch (error) {
+    console.error('Erro no teste de performance:', error);
+    res.status(500).json({ 
+      error: 'Erro no teste de performance',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
 // Debug endpoint para testar conectividade
 router.get('/debug', async (req, res) => {
   try {
@@ -463,6 +519,7 @@ router.get('/debug', async (req, res) => {
     res.json({
       status: 'OK',
       timestamp: new Date().toISOString(),
+      cacheSize: cache.size,
       environment: {
         zapi_url_configured: !!process.env.ZAPI_URL,
         zapi_token_configured: !!process.env.ZAPI_CLIENT_TOKEN,
@@ -471,6 +528,25 @@ router.get('/debug', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro no debug endpoint:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Endpoint para limpar cache (útil para debug e manutenção)
+router.post('/debug/clear-cache', (req, res) => {
+  try {
+    const cacheSize = cache.size;
+    cache.clear();
+    console.log(`🧹 Cache limpo: ${cacheSize} entradas removidas`);
+    
+    res.json({
+      success: true,
+      message: `Cache limpo com sucesso`,
+      entriesRemoved: cacheSize,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Erro ao limpar cache:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

@@ -61,9 +61,39 @@ export interface RecentActivity {
 
 // Listar todos os clientes com última mensagem
 export async function getAllClients(): Promise<Client[]> {
-  const { data, error } = await supabase.rpc("get_clients_with_last_message");
-  if (error) throw error;
-  return data;
+  const { data: clients, error: clientError } = await supabase
+    .from("clients")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (clientError) {
+    console.error("Erro ao buscar clientes:", clientError);
+    throw clientError;
+  }
+  
+  const clientsWithLastMessage = await Promise.all(
+    clients.map(async (client: Client) => {
+      const { data: lastMessage } = await supabase
+        .from("chat_messages")
+        .select("created_at")
+        .eq("client_id", client.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      return {
+        ...client,
+        last_message_at: lastMessage?.created_at || client.created_at,
+      };
+    })
+  );
+
+  // Ordenar por data da última mensagem
+  clientsWithLastMessage.sort((a, b) => {
+    return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
+  });
+
+  return clientsWithLastMessage;
 }
 
 // Obter histórico completo de uma conversa
@@ -237,32 +267,37 @@ export async function savePendingPlan(
 
 // Obter planos pendentes de revisão
 export async function getPendingPlans(): Promise<PendingPlan[]> {
-  const { data, error } = await supabase
+  const { data: plans, error } = await supabase
     .from("pending_plans")
-    .select(
-      `
-        id,
-        client_id,
-        plan_content,
-        created_at,
-        status,
-        clients!inner(phone)
-      `
-    )
+    .select("*")
     .eq("status", "pending")
     .order("created_at", { ascending: false });
+  
   if (error) {
     console.error("Erro ao buscar planos pendentes:", error);
-    throw error; // Propagar erro em vez de suprimir
+    throw error;
   }
-  return data.map((plan: { id: string; client_id: string; clients: { phone: string }[]; plan_content: string; created_at: string; status: string }) => ({
-    id: plan.id,
-    client_id: plan.client_id,
-    client_phone: plan.clients[0].phone,
-    plan_content: plan.plan_content,
-    created_at: plan.created_at,
-    status: plan.status,
-  }));
+  
+  if (!plans) {
+    return [];
+  }
+
+  const plansWithClientPhone = await Promise.all(
+    plans.map(async (plan: any) => {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("phone")
+        .eq("id", plan.client_id)
+        .single();
+      
+      return {
+        ...plan,
+        client_phone: client?.phone || 'N/A',
+      };
+    })
+  );
+
+  return plansWithClientPhone as PendingPlan[];
 }
 
 // Aprovar/rejeitar plano
@@ -296,15 +331,15 @@ export async function updatePlanStatus(
       .select(`
         client_id,
         plan_content,
-        clients!inner(phone, name)
+        client:clients(phone, name)
       `)
       .eq("id", planId)
       .single();
 
     if (plan) {
       const planContent = editedContent || plan.plan_content;
-      const clientPhone = plan.clients[0]?.phone;
-      const clientName = plan.clients[0]?.name;
+      const clientPhone = plan.client?.phone;
+      const clientName = plan.client?.name;
       
       try {
         // Salvar o plano aprovado na tabela de clientes
@@ -352,14 +387,14 @@ export async function updatePlanStatus(
       .from("pending_plans")
       .select(`
         client_id,
-        clients!inner(phone, name)
+        client:clients(phone, name)
       `)
       .eq("id", planId)
       .single();
 
     if (plan) {
-      const clientPhone = plan.clients[0]?.phone;
-      const clientName = plan.clients[0]?.name;
+      const clientPhone = plan.client?.phone;
+      const clientName = plan.client?.name;
       
       try {
         // Notificar cliente sobre rejeição
@@ -501,18 +536,27 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
       .limit(3);
 
     // Planos pendentes recentes
-    const { data: recentPlans } = await supabase
+    const { data: recentPlansData } = await supabase
       .from("pending_plans")
-      .select(
-        `
-        id,
-        created_at,
-        clients!inner(phone, name)
-      `
-      )
+      .select("id, created_at, client_id")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(2);
+
+    const recentPlans = recentPlansData ? await Promise.all(
+      recentPlansData.map(async (plan: any) => {
+        const { data: client } = await supabase
+          .from('clients')
+          .select('phone, name')
+          .eq('id', plan.client_id)
+          .single();
+        return {
+          id: plan.id,
+          created_at: plan.created_at,
+          clients: client ? [client] : [{phone: 'N/A', name: 'N/A'}],
+        };
+      })
+    ) : [];
 
     // Novos clientes recentes
     const { data: recentClients } = await supabase

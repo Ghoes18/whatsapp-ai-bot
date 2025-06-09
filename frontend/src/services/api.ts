@@ -81,6 +81,9 @@ export const dashboardAPI = {
   getDashboardStats: (): Promise<DashboardStats> =>
     api.get('/stats').then(response => response.data),
 
+  getUnreadMessageCounts: (): Promise<{ [clientId: string]: number }> =>
+    api.get('/messages/unread-counts').then(response => response.data),
+
   getRecentActivity: (): Promise<RecentActivity[]> =>
     api.get('/recent-activity').then(response => response.data),
 

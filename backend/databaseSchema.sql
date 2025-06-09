@@ -7,6 +7,7 @@ CREATE TABLE public.chat_messages (
   role text NOT NULL,
   content text NOT NULL,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
+  read boolean DEFAULT false,
   CONSTRAINT chat_messages_pkey PRIMARY KEY (id),
   CONSTRAINT chat_messages_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
 );

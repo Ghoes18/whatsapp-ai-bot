@@ -3,7 +3,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { handleWebhook } from './webhookHandler';
-import dashboardRoutes from './dashboardRoutes';
+import dashboardRoutes from '../dashboardRoutes';
 
 const app = express();
 const server = createServer(app);

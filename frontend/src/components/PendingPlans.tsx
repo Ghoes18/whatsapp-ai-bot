@@ -33,6 +33,7 @@ const PendingPlans: React.FC = () => {
   const [editedContent, setEditedContent] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     loadPendingPlans();
@@ -61,6 +62,7 @@ const PendingPlans: React.FC = () => {
     if (!selectedPlan) return;
 
     try {
+      setProcessingPlanId(selectedPlan.id);
       await dashboardAPI.reviewPlan(
         selectedPlan.id,
         status,
@@ -75,6 +77,8 @@ const PendingPlans: React.FC = () => {
       setSelectedPlan(null);
     } catch (error) {
       console.error("Erro ao revisar plano:", error);
+    } finally {
+      setProcessingPlanId(null);
     }
   };
 
@@ -131,6 +135,7 @@ const PendingPlans: React.FC = () => {
         <Grid container spacing={3}>
           {pendingPlans.map((plan) => {
             const planInfo = getplanType(plan.plan_content);
+            const isProcessing = processingPlanId === plan.id;
             return (
               <Grid item xs={12} md={6} lg={4} key={plan.id}>
                 <Card
@@ -190,6 +195,7 @@ const PendingPlans: React.FC = () => {
                       startIcon={<EditIcon />}
                       onClick={() => openEditModal(plan)}
                       sx={{ mr: 1 }}
+                      disabled={isProcessing}
                     >
                       Editar
                     </Button>
@@ -204,8 +210,9 @@ const PendingPlans: React.FC = () => {
                         handleReview("approved");
                       }}
                       sx={{ mr: 1 }}
+                      disabled={isProcessing}
                     >
-                      Aprovar
+                      {isProcessing ? "Processando..." : "Aprovar"}
                     </Button>
                     <Button
                       variant="contained"
@@ -216,8 +223,9 @@ const PendingPlans: React.FC = () => {
                         setSelectedPlan(plan);
                         handleReview("rejected");
                       }}
+                      disabled={isProcessing}
                     >
-                      Rejeitar
+                      {isProcessing ? "Processando..." : "Rejeitar"}
                     </Button>
                   </CardActions>
                 </Card>
@@ -230,7 +238,7 @@ const PendingPlans: React.FC = () => {
       {/* Modal de Edição */}
       <Dialog
         open={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        onClose={() => !processingPlanId && setIsEditModalOpen(false)}
         maxWidth="md"
         fullWidth
       >
@@ -255,26 +263,34 @@ const PendingPlans: React.FC = () => {
             variant="outlined"
             placeholder="Edite o conteúdo do plano..."
             sx={{ mb: 2 }}
+            disabled={!!processingPlanId}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIsEditModalOpen(false)}>Cancelar</Button>
+          <Button 
+            onClick={() => setIsEditModalOpen(false)}
+            disabled={!!processingPlanId}
+          >
+            Cancelar
+          </Button>
           <Button
             variant="contained"
             color="error"
             startIcon={<RejectIcon />}
             onClick={() => handleReview("rejected")}
             sx={{ mr: 1 }}
+            disabled={!!processingPlanId}
           >
-            Rejeitar
+            {processingPlanId ? "Processando..." : "Rejeitar"}
           </Button>
           <Button
             variant="contained"
             color="success"
             startIcon={<ApproveIcon />}
             onClick={() => handleReview("approved")}
+            disabled={!!processingPlanId}
           >
-            Aprovar e Enviar
+            {processingPlanId ? "Processando..." : "Aprovar e Enviar"}
           </Button>
         </DialogActions>
       </Dialog>
