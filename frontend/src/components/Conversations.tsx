@@ -213,14 +213,22 @@ const Conversations: React.FC = () => {
     // Marcar que estamos processando este cliente
     lastMarkedReadRef.current = targetClientId;
 
-    // Aguardar 2 segundos antes de marcar como lido (debounce aumentado)
+    // Aguardar 200ms antes de marcar como lido (debounce ainda mais reduzido)
     markReadTimeoutRef.current = setTimeout(async () => {
       try {
         console.log(`📖 Marcando mensagens como lidas para cliente: ${targetClientId}`);
         await dashboardAPI.markClientMessagesAsRead(targetClientId);
         
-        // Atualizar notificações
+        // Atualizar notificações imediatamente
         updateNotifications();
+        
+        // Invalidar cache de mensagens para forçar atualização
+        delete messagesCacheRef.current[targetClientId];
+        
+        // Forçar atualização adicional após 1 segundo para garantir sincronização
+        setTimeout(() => {
+          updateNotifications();
+        }, 1000);
         
         console.log('✅ Mensagens marcadas como lidas');
       } catch (error) {
@@ -228,7 +236,7 @@ const Conversations: React.FC = () => {
       } finally {
         lastMarkedReadRef.current = null;
       }
-    }, 2000);
+    }, 200);
   }, [updateNotifications]);
 
   // Carregar dados quando o componente monta

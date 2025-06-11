@@ -88,6 +88,45 @@ const PendingPlans: React.FC = () => {
     }
   };
 
+  const handleApprovePlan = async (plan: PendingPlan) => {
+    try {
+      setProcessingPlanId(plan.id);
+      await dashboardAPI.reviewPlan(
+        plan.id,
+        "approved",
+        plan.plan_content // Usar o conteúdo original do plano
+      );
+
+      // Atualizar localmente
+      setPendingPlans((prev) =>
+        prev.filter((p) => p.id !== plan.id)
+      );
+    } catch (error) {
+      console.error("Erro ao aprovar plano:", error);
+    } finally {
+      setProcessingPlanId(null);
+    }
+  };
+
+  const handleRejectPlan = async (plan: PendingPlan) => {
+    try {
+      setProcessingPlanId(plan.id);
+      await dashboardAPI.reviewPlan(
+        plan.id,
+        "rejected"
+      );
+
+      // Atualizar localmente
+      setPendingPlans((prev) =>
+        prev.filter((p) => p.id !== plan.id)
+      );
+    } catch (error) {
+      console.error("Erro ao rejeitar plano:", error);
+    } finally {
+      setProcessingPlanId(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR", {
       day: "2-digit",
@@ -131,9 +170,9 @@ const PendingPlans: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <div className="w-12 h-12 mx-auto mb-4 border-b-2 rounded-full animate-spin border-primary-600"></div>
           <p className="text-gray-600">Carregando planos pendentes...</p>
         </div>
       </div>
@@ -146,9 +185,9 @@ const PendingPlans: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-900">Planos Pendentes de Aprovação</h1>
         <button 
           onClick={loadPendingPlans}
-          className="btn-secondary flex items-center space-x-2"
+          className="flex items-center space-x-2 btn-secondary"
         >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           <span>Atualizar</span>
@@ -156,11 +195,11 @@ const PendingPlans: React.FC = () => {
       </div>
 
       {!Array.isArray(pendingPlans) || pendingPlans.length === 0 ? (
-        <div className="card text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ScheduleIcon className="h-8 w-8 text-gray-400" />
+        <div className="text-center card">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
+            <ScheduleIcon className="w-8 h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <h3 className="mb-2 text-lg font-medium text-gray-900">
             Nenhum plano pendente de aprovação
           </h3>
           <p className="text-gray-500">
@@ -168,7 +207,7 @@ const PendingPlans: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {pendingPlans.map((plan) => {
             const planInfo = getPlanType(plan.plan_content);
             const Icon = planInfo.icon;
@@ -177,7 +216,7 @@ const PendingPlans: React.FC = () => {
             return (
               <div
                 key={plan.id}
-                className="card hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+                className="transition-all duration-300 card hover:shadow-lg hover:-translate-y-1"
               >
                 <div className="flex items-center mb-4">
                   <div className={`w-10 h-10 ${planInfo.bgColor} rounded-full flex items-center justify-center mr-3`}>
@@ -196,8 +235,8 @@ const PendingPlans: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="border-t border-gray-200 pt-4 mb-4">
-                  <p className="text-sm text-gray-700 line-clamp-6 mb-4">
+                <div className="pt-4 mb-4 border-t border-gray-200">
+                  <p className="mb-4 text-sm text-gray-700 line-clamp-6">
                     {plan.plan_content}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -209,25 +248,25 @@ const PendingPlans: React.FC = () => {
                   <button
                     onClick={() => openEditModal(plan)}
                     disabled={isProcessing}
-                    className="flex-1 btn-secondary text-sm flex items-center justify-center space-x-1"
+                    className="flex items-center justify-center flex-1 space-x-1 text-sm btn-secondary"
                   >
-                    <EditIcon className="h-4 w-4" />
+                    <EditIcon className="w-4 h-4" />
                     <span>Editar</span>
                   </button>
                   <button
-                    onClick={() => handleReview("approved")}
+                    onClick={() => handleApprovePlan(plan)}
                     disabled={isProcessing}
-                    className="flex-1 btn-primary text-sm flex items-center justify-center space-x-1"
+                    className="flex items-center justify-center flex-1 space-x-1 text-sm btn-primary"
                   >
-                    <ApproveIcon className="h-4 w-4" />
+                    <ApproveIcon className="w-4 h-4" />
                     <span>Aprovar</span>
                   </button>
                   <button
-                    onClick={() => handleReview("rejected")}
+                    onClick={() => handleRejectPlan(plan)}
                     disabled={isProcessing}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 text-sm flex items-center justify-center space-x-1 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center flex-1 px-3 py-2 space-x-1 text-sm font-medium text-white transition-colors duration-200 bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
-                    <RejectIcon className="h-4 w-4" />
+                    <RejectIcon className="w-4 h-4" />
                     <span>Rejeitar</span>
                   </button>
                 </div>
@@ -239,27 +278,27 @@ const PendingPlans: React.FC = () => {
 
       {/* Modal de Edição */}
       {isEditModalOpen && selectedPlan && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">
                 Editar Plano
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="mt-1 text-sm text-gray-500">
                 Cliente: {selectedPlan.client_phone}
               </p>
             </div>
             
-            <div className="p-6 flex-1 overflow-y-auto">
+            <div className="flex-1 p-6 overflow-y-auto">
               <textarea
                 value={editedContent}
                 onChange={(e) => setEditedContent(e.target.value)}
-                className="w-full h-64 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                className="w-full h-64 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="Conteúdo do plano..."
               />
             </div>
             
-            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+            <div className="flex justify-end p-6 space-x-3 border-t border-gray-200">
               <button
                 onClick={() => setIsEditModalOpen(false)}
                 className="btn-secondary"
@@ -269,12 +308,12 @@ const PendingPlans: React.FC = () => {
               <button
                 onClick={() => handleReview("approved")}
                 disabled={processingPlanId === selectedPlan.id}
-                className="btn-primary flex items-center space-x-2"
+                className="flex items-center space-x-2 btn-primary"
               >
                 {processingPlanId === selectedPlan.id ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <div className="w-4 h-4 border-b-2 border-white rounded-full animate-spin"></div>
                 ) : (
-                  <ApproveIcon className="h-4 w-4" />
+                  <ApproveIcon className="w-4 h-4" />
                 )}
                 <span>Aprovar com Edições</span>
               </button>

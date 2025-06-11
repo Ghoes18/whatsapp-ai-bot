@@ -22,8 +22,11 @@ export function useNotifications() {
         dashboardAPI.getUnreadMessageCounts()
       ]);
       
+      // Calcular total de mensagens não lidas somando todas as contagens por cliente
+      const totalUnreadMessages = Object.values(unreadCounts).reduce((sum: number, count: number) => sum + count, 0);
+      
       setNotifications({
-        unreadMessages: stats.activeConversations,
+        unreadMessages: totalUnreadMessages, // Usar contagem real de mensagens não lidas
         pendingPlans: stats.pendingPlans,
         clientUnreadCounts: unreadCounts,
       });
@@ -32,15 +35,16 @@ export function useNotifications() {
     }
   }, []);
 
-  // Atualizar notificações a cada 30 segundos
+  // Atualizar notificações a cada 10 segundos (reduzido de 30)
   useEffect(() => {
     updateNotifications();
-    const interval = setInterval(updateNotifications, 30000);
+    const interval = setInterval(updateNotifications, 10000);
     return () => clearInterval(interval);
   }, [updateNotifications]);
 
   return {
     notifications,
     updateNotifications,
+    forceUpdate: updateNotifications, // Alias para forçar atualização
   };
 } 

@@ -30,6 +30,12 @@ CREATE TABLE public.clients (
   plan_url text,
   ai_enabled boolean DEFAULT true,
   last_message_at timestamp with time zone,
+  experience text,
+  available_days text,
+  health_conditions text,
+  exercise_preferences text,
+  equipment text,
+  motivation text,
   CONSTRAINT clients_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.conversations (

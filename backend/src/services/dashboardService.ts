@@ -12,6 +12,12 @@ export interface Client {
   goal?: string;
   activity_level?: string;
   dietary_restrictions?: string;
+  experience?: string;
+  available_days?: string;
+  health_conditions?: string;
+  exercise_preferences?: string;
+  equipment?: string;
+  motivation?: string;
   paid: boolean;
   plan_url?: string;
   plan_text?: string;
@@ -28,6 +34,7 @@ export interface Message {
   role: "user" | "assistant" | "system";
   content: string;
   created_at: string;
+  read?: boolean;
 }
 
 export interface Conversation {
@@ -104,7 +111,7 @@ export async function getConversationHistory(
 ): Promise<Message[]> {
   let query = supabase
     .from("chat_messages")
-    .select("id, client_id, role, content, created_at") // Selecionar apenas campos necessários
+    .select("id, client_id, role, content, created_at, read")
     .eq("client_id", clientId)
     .order("created_at", { ascending: true });
 
@@ -359,18 +366,21 @@ export async function updatePlanStatus(
           .eq('client_id', plan.client_id);
 
         // Enviar notificação via WhatsApp
+        const msg1 = `🎉 Olá ${clientName || 'Cliente'}! O seu plano personalizado foi aprovado e está pronto!`;
         await sendWhatsappMessage(
           clientPhone,
-          `🎉 Olá ${clientName || 'Cliente'}! O seu plano personalizado foi aprovado e está pronto!`
+          msg1
         );
-        
+        await supabase.from('chat_messages').insert([{ client_id: plan.client_id, role: 'assistant', content: msg1 }]);
         // Enviar o plano
         await sendWhatsappMessage(clientPhone, planContent);
-        
+        await supabase.from('chat_messages').insert([{ client_id: plan.client_id, role: 'assistant', content: planContent }]);
+        const msg2 = '✅ Plano enviado! Agora pode fazer perguntas sobre o seu treino e nutrição. Como posso ajudar?';
         await sendWhatsappMessage(
           clientPhone,
-          '✅ Plano enviado! Agora pode fazer perguntas sobre o seu treino e nutrição. Como posso ajudar?'
+          msg2
         );
+        await supabase.from('chat_messages').insert([{ client_id: plan.client_id, role: 'assistant', content: msg2 }]);
 
         console.log(`Plano aprovado e enviado com sucesso para cliente ${plan.client_id}`);
         
@@ -590,7 +600,7 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
           clientPhone: plan.clients[0]?.phone || 'Unknown',
           clientName: plan.clients[0]?.name,
           type: "plan",
-          content: "Plano aguardando aprovação",
+          content: "Novo plano pendente",
           timestamp: plan.created_at,
           status: "pending",
         });
@@ -607,20 +617,48 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
           type: "client",
           content: "Novo cliente cadastrado",
           timestamp: client.created_at,
-          status: "completed",
+          status: "active",
         });
       });
     }
 
     // Ordenar por timestamp
-    activities.sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
+    activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    return activities.slice(0, 5); // Limitar a 5 atividades
+    return activities.slice(0, 10); // Retornar apenas as 10 mais recentes
   } catch (error) {
     console.error("Erro ao buscar atividade recente:", error);
     return [];
+  }
+}
+
+// Obter contagens de mensagens não lidas por cliente
+export async function getUnreadMessageCounts(): Promise<{ [clientId: string]: number }> {
+  try {
+    // Buscar mensagens não lidas (onde read é false ou null)
+    const { data: unreadMessages, error } = await supabase
+      .from("chat_messages")
+      .select("client_id, id")
+      .or("read.is.null,read.eq.false")
+      .eq("role", "user"); // Apenas mensagens do usuário
+
+    if (error) {
+      console.error("Erro ao buscar mensagens não lidas:", error);
+      return {};
+    }
+
+    // Agrupar por client_id e contar
+    const counts: { [clientId: string]: number } = {};
+    if (unreadMessages) {
+      unreadMessages.forEach((message: any) => {
+        const clientId = message.client_id;
+        counts[clientId] = (counts[clientId] || 0) + 1;
+      });
+    }
+
+    return counts;
+  } catch (error) {
+    console.error("Erro ao contar mensagens não lidas:", error);
+    return {};
   }
 }

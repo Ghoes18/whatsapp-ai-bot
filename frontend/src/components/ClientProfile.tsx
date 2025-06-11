@@ -138,9 +138,9 @@ const ClientProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <div className="w-12 h-12 mx-auto mb-4 border-b-2 rounded-full animate-spin border-primary-600"></div>
           <p className="text-gray-600">Carregando perfil do cliente...</p>
         </div>
       </div>
@@ -149,12 +149,12 @@ const ClientProfile: React.FC = () => {
 
   if (!client) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <PersonIcon className="h-8 w-8 text-gray-400" />
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
+            <PersonIcon className="w-8 h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Cliente não encontrado</h3>
+          <h3 className="mb-2 text-lg font-medium text-gray-900">Cliente não encontrado</h3>
           <p className="text-gray-500">O cliente solicitado não foi encontrado no sistema.</p>
         </div>
       </div>
@@ -176,50 +176,50 @@ const ClientProfile: React.FC = () => {
           >
             IA {client.ai_enabled ? 'Ativada' : 'Desativada'}
           </button>
-          <button className="btn-primary flex items-center space-x-2">
-            <WhatsAppIcon className="h-4 w-4" />
+          <button className="flex items-center space-x-2 btn-primary">
+            <WhatsAppIcon className="w-4 h-4" />
             <span>Conversar</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Informações Básicas */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           <div className="card">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Informações Pessoais</h2>
               {!isEditing ? (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="btn-secondary flex items-center space-x-2"
+                  className="flex items-center space-x-2 btn-secondary"
                 >
-                  <EditIcon className="h-4 w-4" />
+                  <EditIcon className="w-4 h-4" />
                   <span>Editar</span>
                 </button>
               ) : (
                 <div className="flex space-x-2">
                   <button
                     onClick={handleSave}
-                    className="btn-primary flex items-center space-x-2"
+                    className="flex items-center space-x-2 btn-primary"
                   >
-                    <SaveIcon className="h-4 w-4" />
+                    <SaveIcon className="w-4 h-4" />
                     <span>Salvar</span>
                   </button>
                   <button
                     onClick={handleCancel}
-                    className="btn-secondary flex items-center space-x-2"
+                    className="flex items-center space-x-2 btn-secondary"
                   >
-                    <CancelIcon className="h-4 w-4" />
+                    <CancelIcon className="w-4 h-4" />
                     <span>Cancelar</span>
                   </button>
                 </div>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                <label htmlFor="name" className="block mb-1 text-sm font-medium text-gray-700">Nome</label>
                 <input
                   id="name"
                   type="text"
@@ -231,7 +231,7 @@ const ClientProfile: React.FC = () => {
               </div>
               
               <div>
-                <label htmlFor="age" className="block text-sm font-medium text-gray-700 mb-1">Idade</label>
+                <label htmlFor="age" className="block mb-1 text-sm font-medium text-gray-700">Idade</label>
                 <input
                   id="age"
                   type="number"
@@ -243,7 +243,7 @@ const ClientProfile: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="gender" className="block text-sm font-medium text-gray-700 mb-1">Gênero</label>
+                <label htmlFor="gender" className="block mb-1 text-sm font-medium text-gray-700">Gênero</label>
                 <select
                   id="gender"
                   value={isEditing ? editedClient.gender ?? '' : client.gender ?? ''}
@@ -259,7 +259,7 @@ const ClientProfile: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="height" className="block text-sm font-medium text-gray-700 mb-1">Altura (cm)</label>
+                <label htmlFor="height" className="block mb-1 text-sm font-medium text-gray-700">Altura (cm)</label>
                 <input
                   id="height"
                   type="number"
@@ -271,7 +271,7 @@ const ClientProfile: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="weight" className="block text-sm font-medium text-gray-700 mb-1">Peso (kg)</label>
+                <label htmlFor="weight" className="block mb-1 text-sm font-medium text-gray-700">Peso (kg)</label>
                 <input
                   id="weight"
                   type="number"
@@ -283,7 +283,7 @@ const ClientProfile: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="activity_level" className="block text-sm font-medium text-gray-700 mb-1">Nível de Atividade</label>
+                <label htmlFor="activity_level" className="block mb-1 text-sm font-medium text-gray-700">Nível de Atividade</label>
                 <select
                   id="activity_level"
                   value={isEditing ? editedClient.activity_level ?? '' : client.activity_level ?? ''}
@@ -301,7 +301,7 @@ const ClientProfile: React.FC = () => {
               </div>
 
               <div className="md:col-span-2">
-                <label htmlFor="goal" className="block text-sm font-medium text-gray-700 mb-1">Objetivo</label>
+                <label htmlFor="goal" className="block mb-1 text-sm font-medium text-gray-700">Objetivo</label>
                 <textarea
                   id="goal"
                   value={isEditing ? editedClient.goal ?? '' : client.goal ?? ''}
@@ -313,7 +313,7 @@ const ClientProfile: React.FC = () => {
               </div>
 
               <div className="md:col-span-2">
-                <label htmlFor="dietary_restrictions" className="block text-sm font-medium text-gray-700 mb-1">Restrições Alimentares</label>
+                <label htmlFor="dietary_restrictions" className="block mb-1 text-sm font-medium text-gray-700">Restrições Alimentares</label>
                 <textarea
                   id="dietary_restrictions"
                   value={isEditing ? editedClient.dietary_restrictions ?? '' : client.dietary_restrictions ?? ''}
@@ -329,10 +329,10 @@ const ClientProfile: React.FC = () => {
 
           {/* Histórico de Planos */}
           <div className="card">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Histórico de Planos</h2>
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ScheduleIcon className="h-8 w-8 text-gray-400" />
+            <h2 className="mb-4 text-xl font-semibold text-gray-900">Histórico de Planos</h2>
+            <div className="py-8 text-center">
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
+                <ScheduleIcon className="w-8 h-8 text-gray-400" />
               </div>
               <p className="text-gray-500">Nenhum plano encontrado</p>
             </div>
@@ -343,11 +343,11 @@ const ClientProfile: React.FC = () => {
         <div className="space-y-6">
           {/* Informações de Contato */}
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações de Contato</h3>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Informações de Contato</h3>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                  <PersonIcon className="h-5 w-5 text-primary-600" />
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary-100">
+                  <PersonIcon className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">{client.name ?? 'Nome não informado'}</p>
@@ -356,8 +356,8 @@ const ClientProfile: React.FC = () => {
               </div>
               
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <WhatsAppIcon className="h-5 w-5 text-green-600" />
+                <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
+                  <WhatsAppIcon className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">{client.phone ?? 'Telefone não informado'}</p>
@@ -370,7 +370,7 @@ const ClientProfile: React.FC = () => {
           {/* Estatísticas */}
           {stats && (
             <div className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Estatísticas</h3>
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">Estatísticas</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Total de Mensagens</span>
@@ -392,15 +392,15 @@ const ClientProfile: React.FC = () => {
 
           {/* Ações Rápidas */}
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Ações Rápidas</h3>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Ações Rápidas</h3>
             <div className="space-y-2">
-              <button className="w-full btn-primary text-sm">
+              <button className="w-full text-sm btn-primary">
                 Gerar Novo Plano
               </button>
-              <button className="w-full btn-secondary text-sm">
+              <button className="w-full text-sm btn-secondary">
                 Ver Conversas
               </button>
-              <button className="w-full btn-secondary text-sm">
+              <button className="w-full text-sm btn-secondary">
                 Exportar Dados
               </button>
             </div>

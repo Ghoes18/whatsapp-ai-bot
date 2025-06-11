@@ -1,16 +1,12 @@
 import { Request, Response, RequestHandler } from "express";
-import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import { sendWhatsappMessage } from "./services/zapi";
-import fs from 'fs';
-import path from 'path';
-import { generateTrainingPlan, askQuestionToAI } from './services/openaiService';
+import { generateTrainingAndNutritionPlan, askQuestionToAI } from './services/openaiService';
 import { generatePlanPDF } from './services/pdfService';
 import { getOrCreateClient, getActiveConversation, updateConversationContext, updateClientAfterPayment, supabase, savePlanText } from './services/supabaseService';
 
 dotenv.config();
 
-// Estados possíveis do cliente
 const STATES = {
   START: "START",
   WAITING_FOR_INFO: "WAITING_FOR_INFO",
@@ -21,7 +17,6 @@ const STATES = {
 } as const;
 type State = typeof STATES[keyof typeof STATES];
 
-// Tipo para o contexto do cliente
 interface ClientContext {
   name?: string;
   age?: string;
@@ -29,10 +24,16 @@ interface ClientContext {
   gender?: string;
   height?: string;
   weight?: string;
+  experience?: string;
+  available_days?: string;
+  health_conditions?: string;
+  exercise_preferences?: string;
+  dietary_restrictions?: string;
+  equipment?: string;
+  motivation?: string;
   [key: string]: any;
 }
 
-// Função helper para salvar mensagens enviadas pelo bot
 async function saveAssistantMessage(clientId: string, content: string) {
   try {
     const { error: messageError } = await supabase.from("chat_messages").insert([
@@ -143,7 +144,6 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
     if (!client) return;
 
     // SALVAR MENSAGEM RECEBIDA NA TABELA CHAT_MESSAGES
-    console.log('Salvando mensagem recebida via WhatsApp...');
     try {
       const { error: messageError } = await supabase.from("chat_messages").insert([
         {
@@ -152,28 +152,20 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
           content: text,
         },
       ]);
-
-      if (messageError) {
-        console.error("Erro ao salvar mensagem recebida:", messageError);
-      } else {
-        console.log('Mensagem recebida salva com sucesso');
-      }
+      if (messageError) console.error("Erro ao salvar mensagem recebida:", messageError);
+      else console.log('Mensagem recebida salva com sucesso');
     } catch (error) {
       console.error('Erro ao salvar mensagem recebida:', error);
     }
 
-    // Verificar se a IA está ativa para este cliente
     if (!client.ai_enabled) {
-      console.log(`IA desativada para cliente ${client.id}. Mensagem ignorada.`);
       res.status(200).send("IA desativada para este cliente");
       return;
     }
 
-    // Buscar conversa ativa
     const conversation = await getActiveConversation(client.id);
     let userState: State = conversation?.state || STATES.START;
 
-    // Processar de acordo com o estado
     switch (userState) {
       case STATES.START:
         await handleStartState(from, client.id);
@@ -219,8 +211,7 @@ async function handleStartState(from: string, clientId: string) {
       console.log("Erro ao criar conversa:", newConvError);
       return;
     }
-    
-    const message = "Olá! Qual seu nome?";
+    const message = "Olá! Qual o seu nome?";
     await sendWhatsappMessage(from, message);
     await saveAssistantMessage(clientId, message);
   } catch (error) {
@@ -268,6 +259,48 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
     } else if (!context.weight) {
       context.weight = text;
       await updateConversationContext(conversation?.id, context);
+      const message = "Qual sua experiência com exercícios? (iniciante, intermediário, avançado)";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
+    } else if (!context.experience) {
+      context.experience = text;
+      await updateConversationContext(conversation?.id, context);
+      const message = "Quantos dias por semana pode treinar? (ex: 3 dias, 5 dias)";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
+    } else if (!context.available_days) {
+      context.available_days = text;
+      await updateConversationContext(conversation?.id, context);
+      const message = "Tem alguma condição de saúde ou lesão que deva considerar? (se não, responda 'nenhuma')";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
+    } else if (!context.health_conditions) {
+      context.health_conditions = text;
+      await updateConversationContext(conversation?.id, context);
+      const message = "Que tipo de exercícios prefere? (ex: musculação, cardio, yoga, funcional)";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
+    } else if (!context.exercise_preferences) {
+      context.exercise_preferences = text;
+      await updateConversationContext(conversation?.id, context);
+      const message = "Tem restrições alimentares ou alergias? (se não, responda 'nenhuma')";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
+    } else if (!context.dietary_restrictions) {
+      context.dietary_restrictions = text;
+      await updateConversationContext(conversation?.id, context);
+      const message = "Que equipamento tem disponível? (ex: halteres, elásticos, apenas peso corporal)";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
+    } else if (!context.equipment) {
+      context.equipment = text;
+      await updateConversationContext(conversation?.id, context);
+      const message = "Qual é a sua principal motivação para treinar? (ex: saúde, estética, competição)";
+      await sendWhatsappMessage(from, message);
+      await saveAssistantMessage(conversation.client_id, message);
+    } else if (!context.motivation) {
+      context.motivation = text;
+      await updateConversationContext(conversation?.id, context);
       
       // TODAS AS INFORMAÇÕES COLETADAS - SALVAR NA TABELA CLIENTS
       console.log('Salvando dados do cliente na tabela clients...');
@@ -283,6 +316,13 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
             height: parseFloat(context.height) || null,
             weight: parseFloat(context.weight) || null,
             goal: context.goal,
+            experience: context.experience,
+            available_days: context.available_days,
+            health_conditions: context.health_conditions,
+            exercise_preferences: context.exercise_preferences,
+            dietary_restrictions: context.dietary_restrictions,
+            equipment: context.equipment,
+            motivation: context.motivation,
             last_context: context,
             updated_at: new Date().toISOString(),
           })
@@ -344,7 +384,7 @@ async function handlePaidState(from: string, conversation: any) {
     }
 
     // Gerar plano com OpenAI
-    const plano = await generateTrainingPlan(context);
+    const plano = await generateTrainingAndNutritionPlan(context);
 
     // MUDANÇA: Salvar plano como PENDENTE para revisão em vez de enviar diretamente
     console.log('Salvando plano como pendente para revisão...');
@@ -368,8 +408,11 @@ async function handlePaidState(from: string, conversation: any) {
 
     // Notificar o cliente que o plano está sendo preparado
     await sendWhatsappMessage(from, '✅ Pagamento confirmado! Estamos a preparar o seu plano personalizado.');
+    await saveAssistantMessage(conversation.client_id, '✅ Pagamento confirmado! Estamos a preparar o seu plano personalizado.');
     await sendWhatsappMessage(from, '📋 O seu plano será revisto pela nossa equipa e enviado em breve.');
+    await saveAssistantMessage(conversation.client_id, '📋 O seu plano será revisto pela nossa equipa e enviado em breve.');
     await sendWhatsappMessage(from, '⏰ Normalmente este processo demora 24-48 horas.');
+    await saveAssistantMessage(conversation.client_id, '⏰ Normalmente este processo demora 24-48 horas.');
 
   } catch (error) {
     console.log("Erro no estado PAID:", error);

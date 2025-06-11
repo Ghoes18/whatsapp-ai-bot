@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { useNotifications } from '../hooks/useNotifications';
+import { dashboardAPI } from '../services/api';
 
 // Simple SVG Icons
 const ChartBarIcon = ({ className }: { className?: string }) => (
@@ -39,6 +40,45 @@ const Sidebar: React.FC = () => {
   const { notifications } = useNotifications();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Estado para IA do cliente selecionado
+  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [sidebarClientId, setSidebarClientId] = useState<string | null>(null);
+
+  // Detectar se está em uma conversa e extrair clientId
+  useEffect(() => {
+    const match = matchPath('/conversations/:clientId', location.pathname);
+    if (match && match.params && match.params.clientId) {
+      setSidebarClientId(match.params.clientId);
+    } else {
+      setSidebarClientId(null);
+      setAiEnabled(null);
+    }
+  }, [location.pathname]);
+
+  // Buscar status da IA do cliente selecionado
+  useEffect(() => {
+    if (sidebarClientId) {
+      dashboardAPI.getClient(sidebarClientId).then(client => {
+        setAiEnabled(client.ai_enabled);
+      }).catch(() => setAiEnabled(null));
+    }
+  }, [sidebarClientId]);
+
+  // Alternar IA
+  const handleToggleAI = async () => {
+    if (!sidebarClientId) return;
+    setAiLoading(true);
+    try {
+      const response = await dashboardAPI.toggleAI(sidebarClientId);
+      setAiEnabled(response.ai_enabled);
+    } catch (error) {
+      console.error('Erro ao alternar IA:', error);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const menuItems = [
     {
       text: 'Dashboard',
@@ -64,16 +104,16 @@ const Sidebar: React.FC = () => {
   return (
     <>
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      <div className="fixed z-50 lg:hidden top-4 left-4">
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 rounded-lg bg-white shadow-lg border border-gray-200"
+          className="p-2 bg-white border border-gray-200 rounded-lg shadow-lg"
           aria-label="Toggle menu"
         >
           {isMobileMenuOpen ? (
-            <XMarkIcon className="h-6 w-6 text-gray-600" />
+            <XMarkIcon className="w-6 h-6 text-gray-600" />
           ) : (
-            <Bars3Icon className="h-6 w-6 text-gray-600" />
+            <Bars3Icon className="w-6 h-6 text-gray-600" />
           )}
         </button>
       </div>
@@ -86,8 +126,8 @@ const Sidebar: React.FC = () => {
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center">
-              <ChartBarIcon className="h-6 w-6 text-white" />
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600">
+              <ChartBarIcon className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">AI Bot</h1>
@@ -118,7 +158,7 @@ const Sidebar: React.FC = () => {
                 <div className="relative">
                   <Icon className={`h-5 w-5 ${isActive(item.path) ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                   {item.badge && item.badge > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                    <span className="absolute flex items-center justify-center w-5 h-5 text-xs font-medium text-white bg-red-500 rounded-full -top-2 -right-2">
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}
@@ -130,12 +170,27 @@ const Sidebar: React.FC = () => {
             );
           })}
         </nav>
+        {/* Botão de IA do cliente selecionado */}
+        {sidebarClientId && aiEnabled !== null && (
+          <div className="px-4 pb-4">
+            <button
+              onClick={handleToggleAI}
+              disabled={aiLoading}
+              className={`w-full mt-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm
+                ${aiEnabled ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}
+                ${aiLoading ? 'opacity-50 cursor-not-allowed' : ''}
+              `}
+            >
+              {aiLoading ? 'Atualizando...' : `IA ${aiEnabled ? 'Ativada' : 'Desativada'}`}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Mobile overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+          className="fixed inset-0 z-30 bg-black bg-opacity-50 lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}

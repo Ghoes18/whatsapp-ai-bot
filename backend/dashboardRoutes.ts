@@ -12,7 +12,8 @@ import {
   getClientById,
   getClientStats,
   getDashboardStats,
-  getRecentActivity
+  getRecentActivity,
+  getUnreadMessageCounts
 } from './src/services/dashboardService';
 import { 
   sendWhatsappMessage, 
@@ -101,6 +102,17 @@ router.get('/recent-activity', async (req, res) => {
     res.json(activity);
   } catch (error) {
     console.error('Erro ao buscar atividade recente:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Obter contagens de mensagens não lidas por cliente
+router.get('/messages/unread-counts', async (req, res) => {
+  try {
+    const unreadCounts = await getUnreadMessageCounts();
+    res.json(unreadCounts);
+  } catch (error) {
+    console.error('Erro ao buscar contagens de mensagens não lidas:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -309,25 +321,50 @@ router.post('/clients/:clientId/messages/mark-read', async (req, res) => {
   try {
     const { clientId } = req.params;
     
-    // Usar função otimizada da base de dados para batch operation
-    const { data, error } = await supabase.rpc('mark_client_messages_read', {
-      p_client_id: clientId
-    });
+    // Tentar usar função RPC primeiro
+    try {
+      const { data, error } = await supabase.rpc('mark_client_messages_read', {
+        p_client_id: clientId
+      });
+      
+      if (!error && data) {
+        const result = Array.isArray(data) ? data[0] : data;
+        
+        // Invalidar cache de mensagens deste cliente
+        invalidateCache(`messages_${clientId}`);
+        
+        console.log(`✅ ${result?.marked_count || 0} mensagens marcadas como lidas para cliente ${clientId}`);
+        return res.json({ 
+          success: result?.success || true, 
+          markedCount: result?.marked_count || 0 
+        });
+      }
+    } catch (rpcError) {
+      console.log('Função RPC não disponível, usando abordagem alternativa...');
+    }
     
-    if (error) {
-      console.error('Erro ao marcar mensagens como lidas:', error);
+    // Abordagem alternativa: atualizar diretamente na tabela
+    const { data: updateResult, error: updateError } = await supabase
+      .from('chat_messages')
+      .update({ read: true })
+      .eq('client_id', clientId)
+      .eq('read', false)
+      .select('id');
+    
+    if (updateError) {
+      console.error('Erro ao marcar mensagens como lidas:', updateError);
       return res.status(500).json({ error: 'Erro interno do servidor' });
     }
     
-    const result = Array.isArray(data) ? data[0] : data;
+    const markedCount = updateResult?.length || 0;
     
     // Invalidar cache de mensagens deste cliente
     invalidateCache(`messages_${clientId}`);
     
-    console.log(`✅ ${result?.marked_count || 0} mensagens marcadas como lidas para cliente ${clientId}`);
+    console.log(`✅ ${markedCount} mensagens marcadas como lidas para cliente ${clientId}`);
     res.json({ 
-      success: result?.success || true, 
-      markedCount: result?.marked_count || 0 
+      success: true, 
+      markedCount: markedCount 
     });
   } catch (error) {
     console.error('Erro ao marcar mensagens como lidas:', error);
