@@ -56,6 +56,17 @@ export interface PendingPlan {
   status: "pending" | "approved" | "rejected";
 }
 
+export interface Plan {
+  id: string;
+  client_id: string;
+  type: string;
+  pdf_url: string;
+  created_at: string;
+  expires_at?: string;
+  status: "active" | "expired" | "completed";
+  content?: string;
+}
+
 export interface RecentActivity {
   id: string;
   clientPhone: string;
@@ -307,17 +318,16 @@ export async function getPendingPlans(): Promise<PendingPlan[]> {
   return plansWithClientPhone as PendingPlan[];
 }
 
-// Aprovar/rejeitar plano
-export async function updatePlanStatus(
-  planId: string,
-  status: "approved" | "rejected",
-  editedContent?: string
-): Promise<void> {
+// Helper function to update plan status in database
+async function updatePlanStatusInDB(planId: string, status: string, editedContent?: string): Promise<void> {
   const updateData: any = { status };
 
   if (status === "approved" && editedContent) {
     updateData.plan_content = editedContent;
+    console.log(`📝 DEBUG: Conteúdo editado fornecido: ${editedContent.substring(0, 100)}...`);
   }
+
+  console.log(`📋 DEBUG: Dados de atualização:`, updateData);
 
   const { error } = await supabase
     .from("pending_plans")
@@ -325,110 +335,216 @@ export async function updatePlanStatus(
     .eq("id", planId);
 
   if (error) {
-    console.error("Erro ao atualizar status do plano:", error);
+    console.error("❌ Erro ao atualizar status do plano:", error);
     throw error;
   }
 
-  // Se aprovado, processar e enviar o plano para o cliente
+  console.log(`✅ Status do plano atualizado com sucesso para: ${status}`);
+}
+
+// Helper function to fetch plan data
+async function fetchPlanData(planId: string, includeContent: boolean = false): Promise<any> {
+  const selectFields = includeContent 
+    ? `client_id, plan_content, client:clients(phone, name)`
+    : `client_id, client:clients(phone, name)`;
+
+  const { data: plan, error: planError } = await supabase
+    .from("pending_plans")
+    .select(selectFields)
+    .eq("id", planId)
+    .single();
+
+  if (planError) {
+    console.error("❌ Erro ao buscar dados do plano:", planError);
+    throw planError;
+  }
+
+  if (!plan) {
+    console.error("❌ Plano não encontrado");
+    throw new Error("Plano não encontrado");
+  }
+
+  return plan;
+}
+
+// Helper function to process approved plan
+async function processApprovedPlan(plan: any): Promise<void> {
+  console.log(`📋 DEBUG: Dados do plano encontrados:`, {
+    client_id: plan.client_id,
+    plan_content_length: plan.plan_content?.length ?? 0,
+    client_phone: plan.client?.phone,
+    client_name: plan.client?.name
+  });
+
+  // Salvar plano na tabela plans
+  console.log('💾 Salvando plano na tabela plans...');
+  const savedPlanId = await saveApprovedPlan(plan.client_id, plan.plan_content);
+  console.log(`✅ Plano salvo na tabela plans com ID: ${savedPlanId}`);
+  
+  // Enviar mensagem para o cliente
+  const message = `✅ Seu plano foi aprovado e está pronto!\n\n${plan.plan_content}`;
+  console.log(`📱 Enviando mensagem para: ${plan.client.phone}`);
+  await sendWhatsappMessage(plan.client.phone, message);
+  
+  console.log(`✅ Plano enviado com sucesso para ${plan.client.phone}`);
+}
+
+// Helper function to notify rejected plan
+async function notifyRejectedPlan(plan: any): Promise<void> {
+  const clientPhone = plan.client?.phone;
+  const clientName = plan.client?.name;
+  
+  console.log(`📋 DEBUG: Notificando cliente: ${clientPhone} (${clientName})`);
+  
+  // Notificar cliente sobre rejeição
+  await sendWhatsappMessage(
+    clientPhone,
+    `Olá ${clientName || 'Cliente'}! O seu plano está a ser revisto pela nossa equipa.`
+  );
+  
+  await sendWhatsappMessage(
+    clientPhone,
+    '📋 Estamos a fazer algumas melhorias para garantir a melhor qualidade possível.'
+  );
+  
+  await sendWhatsappMessage(
+    clientPhone,
+    '⏰ Receberá o seu plano personalizado em breve. Obrigado pela paciência!'
+  );
+
+  console.log(`✅ Cliente ${plan.client_id} notificado sobre revisão do plano`);
+}
+
+// Aprovar/rejeitar plano
+export async function updatePlanStatus(
+  planId: string,
+  status: "approved" | "rejected",
+  editedContent?: string
+): Promise<void> {
+  console.log(`🔍 DEBUG: Atualizando status do plano ${planId} para ${status}`);
+  
+  // Update plan status in database
+  await updatePlanStatusInDB(planId, status, editedContent);
+
+  // Process based on status
   if (status === "approved") {
-    console.log('Plano aprovado, processando envio para o cliente...');
-    
-    const { data: plan } = await supabase
-      .from("pending_plans")
-      .select(`
-        client_id,
-        plan_content,
-        client:clients(phone, name)
-      `)
-      .eq("id", planId)
-      .single();
-
-    if (plan) {
-      const planContent = editedContent || plan.plan_content;
-      const clientPhone = plan.client?.phone;
-      const clientName = plan.client?.name;
-      
-      try {
-        // Salvar o plano aprovado na tabela de clientes
-        await supabase
-          .from("clients")
-          .update({
-            plan_text: planContent,
-            paid: true,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", plan.client_id);
-
-        // Atualizar conversa para estado de perguntas
-        await supabase
-          .from('conversations')
-          .update({ state: 'QUESTIONS' })
-          .eq('client_id', plan.client_id);
-
-        // Enviar notificação via WhatsApp
-        const msg1 = `🎉 Olá ${clientName || 'Cliente'}! O seu plano personalizado foi aprovado e está pronto!`;
-        await sendWhatsappMessage(
-          clientPhone,
-          msg1
-        );
-        await supabase.from('chat_messages').insert([{ client_id: plan.client_id, role: 'assistant', content: msg1 }]);
-        // Enviar o plano
-        await sendWhatsappMessage(clientPhone, planContent);
-        await supabase.from('chat_messages').insert([{ client_id: plan.client_id, role: 'assistant', content: planContent }]);
-        const msg2 = '✅ Plano enviado! Agora pode fazer perguntas sobre o seu treino e nutrição. Como posso ajudar?';
-        await sendWhatsappMessage(
-          clientPhone,
-          msg2
-        );
-        await supabase.from('chat_messages').insert([{ client_id: plan.client_id, role: 'assistant', content: msg2 }]);
-
-        console.log(`Plano aprovado e enviado com sucesso para cliente ${plan.client_id}`);
-        
-      } catch (error) {
-        console.error('Erro ao enviar plano aprovado:', error);
-        throw new Error('Plano aprovado mas falhou o envio ao cliente');
-      }
-    }
+    console.log('🔄 Plano aprovado, processando envio para o cliente...');
+    const plan = await fetchPlanData(planId, true);
+    await processApprovedPlan(plan);
   } else if (status === "rejected") {
-    console.log('Plano rejeitado, notificando cliente...');
+    console.log('🔄 Plano rejeitado, notificando cliente...');
+    const plan = await fetchPlanData(planId, false);
+    await notifyRejectedPlan(plan);
+  }
+}
+
+// Salvar plano aprovado na tabela plans
+export async function saveApprovedPlan(clientId: string, planContent: string): Promise<string> {
+  try {
+    console.log(`🔍 DEBUG: Salvando plano aprovado para cliente: ${clientId}`);
+    console.log(`📋 DEBUG: Conteúdo do plano: ${planContent.substring(0, 100)}...`);
     
-    // Buscar dados do plano rejeitado
-    const { data: plan } = await supabase
-      .from("pending_plans")
-      .select(`
-        client_id,
-        client:clients(phone, name)
-      `)
-      .eq("id", planId)
+    // Determinar o tipo do plano baseado no conteúdo
+    let planType = "Geral";
+    if (planContent.toLowerCase().includes("treino") || planContent.toLowerCase().includes("exercício")) {
+      planType = "Treino";
+    } else if (planContent.toLowerCase().includes("nutricional") || planContent.toLowerCase().includes("alimentação")) {
+      planType = "Nutrição";
+    }
+
+    console.log(`📊 DEBUG: Tipo do plano determinado: ${planType}`);
+
+    // Calcular data de expiração (30 dias a partir de agora)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    console.log(`📅 DEBUG: Data de expiração: ${expiresAt.toISOString()}`);
+
+    // Primeiro, inserir o plano com URL temporária
+    const tempPdfUrl = `temp-plan-${Date.now()}.pdf`;
+
+    const { data, error } = await supabase
+      .from("plans")
+      .insert({
+        client_id: clientId,
+        type: planType,
+        pdf_url: tempPdfUrl, // URL temporária para satisfazer a constraint NOT NULL
+        expires_at: expiresAt.toISOString(),
+      })
+      .select("id")
       .single();
 
-    if (plan) {
-      const clientPhone = plan.client?.phone;
-      const clientName = plan.client?.name;
-      
-      try {
-        // Notificar cliente sobre rejeição
-        await sendWhatsappMessage(
-          clientPhone,
-          `Olá ${clientName || 'Cliente'}! O seu plano está a ser revisto pela nossa equipa.`
-        );
-        
-        await sendWhatsappMessage(
-          clientPhone,
-          '📋 Estamos a fazer algumas melhorias para garantir a melhor qualidade possível.'
-        );
-        
-        await sendWhatsappMessage(
-          clientPhone,
-          '⏰ Receberá o seu plano personalizado em breve. Obrigado pela paciência!'
-        );
-
-        console.log(`Cliente ${plan.client_id} notificado sobre revisão do plano`);
-        
-      } catch (error) {
-        console.error('Erro ao notificar cliente sobre plano rejeitado:', error);
-      }
+    if (error) {
+      console.error("❌ Erro ao salvar plano aprovado:", error);
+      throw error;
     }
+
+    console.log(`✅ Plano salvo com sucesso! ID: ${data.id}`);
+
+    // Agora gerar o PDF e atualizar a URL
+    try {
+      console.log('📄 Gerando PDF do plano...');
+      
+      // Buscar dados do cliente para o contexto
+      const { data: client } = await supabase
+        .from('clients')
+        .select('name, age, gender, height, weight, goal')
+        .eq('id', clientId)
+        .single();
+
+      const clientContext = {
+        name: client?.name,
+        age: client?.age?.toString(),
+        gender: client?.gender,
+        height: client?.height?.toString(),
+        weight: client?.weight?.toString(),
+        goal: client?.goal,
+      };
+
+      // Importar e usar o serviço de PDF
+      const { generateAndUploadPlanPDF } = await import('./pdfService');
+      
+      const planData = {
+        id: data.id,
+        client_id: clientId,
+        type: planType,
+        content: planContent,
+        created_at: new Date().toISOString(),
+        expires_at: expiresAt.toISOString(),
+      };
+
+      const pdfUrl = await generateAndUploadPlanPDF(planData, clientContext);
+      
+      // Atualizar o plano com a URL real do PDF
+      const { error: updateError } = await supabase
+        .from("plans")
+        .update({ pdf_url: pdfUrl })
+        .eq("id", data.id);
+
+      if (updateError) {
+        console.error("❌ Erro ao atualizar URL do PDF:", updateError);
+        // Não falhar se não conseguir atualizar a URL
+      } else {
+        console.log(`✅ URL do PDF atualizada: ${pdfUrl}`);
+      }
+
+    } catch (pdfError) {
+      console.error("❌ Erro ao gerar PDF:", pdfError);
+      // Não falhar se não conseguir gerar o PDF, manter a URL temporária
+    }
+
+    console.log(`📋 DEBUG: Dados inseridos:`, {
+      client_id: clientId,
+      type: planType,
+      pdf_url: tempPdfUrl,
+      expires_at: expiresAt.toISOString(),
+      id: data.id
+    });
+    
+    return data.id;
+  } catch (error) {
+    console.error("❌ Erro ao salvar plano aprovado:", error);
+    throw error;
   }
 }
 
@@ -479,6 +595,58 @@ export async function getClientStats(clientId: string) {
     plansReceived: planCount || 0,
     lastActivity: lastMessage?.created_at || null,
   };
+}
+
+// Obter histórico de planos de um cliente
+export async function getClientPlans(clientId: string): Promise<Plan[]> {
+  try {
+    console.log(`🔍 Buscando planos para cliente: ${clientId}`);
+    
+    const { data: plans, error } = await supabase
+      .from("plans")
+      .select("*")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false });
+
+    console.log(`📊 Resultado da consulta:`, { plans, error });
+
+    if (error) {
+      console.error("❌ Erro ao buscar planos do cliente:", error);
+      throw error;
+    }
+
+    if (!plans) {
+      console.log("📭 Nenhum plano encontrado (plans é null/undefined)");
+      return [];
+    }
+
+    console.log(`📋 Encontrados ${plans.length} planos para o cliente`);
+
+    // Processar status dos planos baseado na data de expiração
+    const processedPlans = plans.map((plan: any) => {
+      let status: "active" | "expired" | "completed" = "active";
+      
+      if (plan.expires_at) {
+        const now = new Date();
+        const expiresAt = new Date(plan.expires_at);
+        
+        if (now > expiresAt) {
+          status = "expired";
+        }
+      }
+
+      return {
+        ...plan,
+        status,
+      };
+    });
+
+    console.log(`✅ Retornando ${processedPlans.length} planos processados`);
+    return processedPlans;
+  } catch (error) {
+    console.error("❌ Erro ao buscar planos do cliente:", error);
+    return [];
+  }
 }
 
 // Obter estatísticas gerais do dashboard
@@ -660,5 +828,29 @@ export async function getUnreadMessageCounts(): Promise<{ [clientId: string]: nu
   } catch (error) {
     console.error("Erro ao contar mensagens não lidas:", error);
     return {};
+  }
+}
+
+// Função de debug para listar todos os planos
+export async function debugListAllPlans(): Promise<any[]> {
+  try {
+    console.log("🔍 DEBUG: Listando todos os planos na tabela...");
+    
+    const { data: allPlans, error } = await supabase
+      .from("plans")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    console.log(`📊 DEBUG: Total de planos na tabela: ${allPlans?.length || 0}`);
+    console.log("📋 DEBUG: Planos encontrados:", allPlans);
+    
+    if (error) {
+      console.error("❌ DEBUG: Erro ao listar planos:", error);
+    }
+
+    return allPlans || [];
+  } catch (error) {
+    console.error("❌ DEBUG: Erro ao listar planos:", error);
+    return [];
   }
 }

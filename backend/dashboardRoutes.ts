@@ -13,7 +13,8 @@ import {
   getClientStats,
   getDashboardStats,
   getRecentActivity,
-  getUnreadMessageCounts
+  getUnreadMessageCounts,
+  getClientPlans
 } from './src/services/dashboardService';
 import { 
   sendWhatsappMessage, 
@@ -198,6 +199,32 @@ router.get('/clients/:clientId/messages', async (req, res) => {
     res.json(messages);
   } catch (error) {
     console.error('Erro ao buscar mensagens:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Obter histórico de planos de um cliente
+router.get('/clients/:clientId/plans', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const cacheKey = `plans_${clientId}`;
+    
+    // Verificar cache primeiro
+    const cachedPlans = getCachedData(cacheKey);
+    if (cachedPlans) {
+      console.log(`📋 Retornando planos do cache para cliente: ${clientId}`);
+      return res.json(cachedPlans);
+    }
+    
+    console.log(`📋 Buscando planos no banco para cliente: ${clientId}`);
+    const plans = await getClientPlans(clientId);
+    
+    // Cachear resultado
+    setCachedData(cacheKey, plans);
+    
+    res.json(plans);
+  } catch (error) {
+    console.error('Erro ao buscar planos do cliente:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -662,6 +689,257 @@ router.post('/debug/webhook', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro no debug webhook:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Rota de debug para inserir plano de teste
+router.post('/debug/insert-test-plan', async (req, res) => {
+  try {
+    const { clientId } = req.body;
+    
+    if (!clientId) {
+      return res.status(400).json({ error: 'clientId é obrigatório' });
+    }
+
+    console.log(`🔍 DEBUG: Inserindo plano de teste para cliente: ${clientId}`);
+    
+    // Verificar se o cliente existe
+    const { data: client, error: clientError } = await supabase
+      .from('clients')
+      .select('id, phone, name')
+      .eq('id', clientId)
+      .single();
+
+    if (clientError || !client) {
+      console.error('❌ Cliente não encontrado:', clientError);
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+
+    console.log(`✅ Cliente encontrado: ${client.phone} (${client.name})`);
+
+    // Conteúdo de teste para o plano
+    const testPlanContent = `Plano de Treino Personalizado
+
+Exercícios para ${client.name || 'Cliente'}:
+
+1. Aquecimento (10 minutos):
+   - Corrida leve
+   - Alongamentos dinâmicos
+
+2. Treino Principal (45 minutos):
+   - Agachamentos: 3 séries x 12 repetições
+   - Flexões: 3 séries x 10 repetições
+   - Prancha: 3 séries x 30 segundos
+
+3. Resfriamento (5 minutos):
+   - Alongamentos estáticos
+
+Frequência: 3x por semana
+Duração: 60 minutos por sessão
+
+Este é um plano de teste gerado automaticamente.`;
+
+    // Salvar como plano pendente primeiro
+    const pendingPlanId = await savePendingPlan(clientId, testPlanContent);
+    console.log(`✅ Plano pendente criado com ID: ${pendingPlanId}`);
+
+    // Aprovar o plano automaticamente
+    await updatePlanStatus(pendingPlanId, 'approved', testPlanContent);
+    console.log(`✅ Plano aprovado e salvo na tabela plans`);
+
+    res.json({ 
+      success: true, 
+      message: 'Plano de teste inserido e aprovado com sucesso',
+      pendingPlanId,
+      client: {
+        id: client.id,
+        phone: client.phone,
+        name: client.name
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erro ao inserir plano de teste:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Rota de debug para listar todos os planos
+router.get('/debug/plans', async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: Listando todos os planos...');
+    
+    const { data: plans, error } = await supabase
+      .from('plans')
+      .select(`
+        *,
+        client:clients(phone, name)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Erro ao listar planos:', error);
+      return res.status(500).json({ error: 'Erro ao listar planos' });
+    }
+
+    console.log(`📊 DEBUG: Encontrados ${plans?.length || 0} planos`);
+    
+    res.json({
+      success: true,
+      totalPlans: plans?.length || 0,
+      plans: plans || []
+    });
+  } catch (error) {
+    console.error('❌ Erro ao listar planos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Rota de debug para listar planos pendentes
+router.get('/debug/pending-plans', async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: Listando planos pendentes...');
+    
+    const { data: pendingPlans, error } = await supabase
+      .from('pending_plans')
+      .select(`
+        *,
+        client:clients(phone, name)
+      `)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Erro ao listar planos pendentes:', error);
+      return res.status(500).json({ error: 'Erro ao listar planos pendentes' });
+    }
+
+    console.log(`📊 DEBUG: Encontrados ${pendingPlans?.length || 0} planos pendentes`);
+    
+    res.json({
+      success: true,
+      totalPendingPlans: pendingPlans?.length || 0,
+      pendingPlans: pendingPlans || []
+    });
+  } catch (error) {
+    console.error('❌ Erro ao listar planos pendentes:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Gerar PDF de um plano específico
+router.post('/plans/:planId/generate-pdf', async (req, res) => {
+  try {
+    const { planId } = req.params;
+    
+    console.log(`🔍 Gerando PDF para plano: ${planId}`);
+    
+    // Buscar dados do plano
+    const { data: plan, error: planError } = await supabase
+      .from('plans')
+      .select(`
+        *,
+        client:clients(name, age, gender, height, weight, goal)
+      `)
+      .eq('id', planId)
+      .single();
+
+    if (planError || !plan) {
+      console.error('❌ Plano não encontrado:', planError);
+      return res.status(404).json({ error: 'Plano não encontrado' });
+    }
+
+    // Buscar conteúdo do plano (pode estar em pending_plans se foi aprovado recentemente)
+    const { data: pendingPlan } = await supabase
+      .from('pending_plans')
+      .select('plan_content')
+      .eq('client_id', plan.client_id)
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const planContent = pendingPlan?.plan_content || 'Conteúdo do plano não disponível';
+
+    const clientContext = {
+      name: plan.client?.name,
+      age: plan.client?.age?.toString(),
+      gender: plan.client?.gender,
+      height: plan.client?.height?.toString(),
+      weight: plan.client?.weight?.toString(),
+      goal: plan.client?.goal,
+    };
+
+    // Importar e usar o serviço de PDF
+    const { generateAndUploadPlanPDF } = await import('./src/services/pdfService');
+    
+    const planData = {
+      id: plan.id,
+      client_id: plan.client_id,
+      type: plan.type,
+      content: planContent,
+      created_at: plan.created_at,
+      expires_at: plan.expires_at,
+    };
+
+    const pdfUrl = await generateAndUploadPlanPDF(planData, clientContext);
+    
+    // Atualizar o plano com a nova URL do PDF
+    const { error: updateError } = await supabase
+      .from('plans')
+      .update({ pdf_url: pdfUrl })
+      .eq('id', planId);
+
+    if (updateError) {
+      console.error('❌ Erro ao atualizar URL do PDF:', updateError);
+    }
+
+    res.json({ 
+      success: true, 
+      pdfUrl,
+      message: 'PDF gerado com sucesso'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao gerar PDF:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Visualizar PDF de um plano
+router.get('/plans/:planId/pdf', async (req, res) => {
+  try {
+    const { planId } = req.params;
+    
+    console.log(`🔍 Buscando PDF para plano: ${planId}`);
+    
+    // Buscar dados do plano
+    const { data: plan, error: planError } = await supabase
+      .from('plans')
+      .select('pdf_url')
+      .eq('id', planId)
+      .single();
+
+    if (planError || !plan) {
+      console.error('❌ Plano não encontrado:', planError);
+      return res.status(404).json({ error: 'Plano não encontrado' });
+    }
+
+    if (!plan.pdf_url || plan.pdf_url.startsWith('temp-')) {
+      console.log('📄 PDF não encontrado ou temporário, redirecionando para geração...');
+      return res.json({ 
+        needsGeneration: true,
+        message: 'PDF precisa ser gerado'
+      });
+    }
+
+    // Redirecionar para a URL do PDF
+    res.json({ 
+      success: true,
+      pdfUrl: plan.pdf_url,
+      message: 'PDF encontrado'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao buscar PDF:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

@@ -52,6 +52,17 @@ export interface PendingPlan {
   status: 'pending' | 'approved' | 'rejected';
 }
 
+export interface Plan {
+  id: string;
+  client_id: string;
+  type: string;
+  pdf_url: string;
+  created_at: string;
+  expires_at?: string;
+  status: 'active' | 'expired' | 'completed';
+  content?: string;
+}
+
 export interface ClientStats {
   totalMessages: number;
   plansReceived: number;
@@ -96,6 +107,9 @@ export const dashboardAPI = {
 
   getClientStats: (clientId: string): Promise<ClientStats> =>
     api.get(`/clients/${clientId}/stats`).then(response => response.data),
+
+  getClientPlans: (clientId: string): Promise<Plan[]> =>
+    api.get(`/clients/${clientId}/plans`).then(response => response.data),
 
   updateClient: (clientId: string, data: Partial<Client>): Promise<void> =>
     api.put(`/clients/${clientId}`, data).then(response => response.data),
@@ -156,6 +170,13 @@ export const dashboardAPI = {
 
   createPendingPlan: (clientId: string, planContent: string): Promise<{ planId: string }> =>
     api.post('/pending-plans', { clientId, planContent }).then(response => response.data),
+
+  // PDFs dos Planos
+  generatePlanPDF: (planId: string): Promise<{ pdfUrl: string }> =>
+    api.post(`/plans/${planId}/generate-pdf`).then(response => response.data),
+
+  getPlanPDF: (planId: string): Promise<{ pdfUrl?: string; needsGeneration?: boolean }> =>
+    api.get(`/plans/${planId}/pdf`).then(response => response.data),
 };
 
 export default api; 
