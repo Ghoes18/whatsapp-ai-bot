@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { useParams } from "react-router-dom"
 import { dashboardAPI } from "../services/api"
 import type { Client, ClientStats, Plan } from "../services/api"
+import PlanViewModal from "./PlanViewModal"
 
 // Enhanced SVG Icons
 const PersonIcon = ({ className }: { className?: string }) => (
@@ -77,7 +78,8 @@ const ClientProfile: React.FC = () => {
   const [editedClient, setEditedClient] = useState<Partial<Client>>({})
   const [loading, setLoading] = useState(true)
   const [loadingPlans, setLoadingPlans] = useState(false)
-  const [generatingPDF, setGeneratingPDF] = useState<string | null>(null)
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
 
   useEffect(() => {
     if (clientId) {
@@ -182,34 +184,14 @@ const ClientProfile: React.FC = () => {
     })
   }
 
-  const handleViewPDF = async (plan: Plan) => {
-    try {
-      setGeneratingPDF(plan.id)
-      
-      // Primeiro, tentar buscar o PDF existente
-      const pdfResponse = await dashboardAPI.getPlanPDF(plan.id)
-      
-      if (pdfResponse.needsGeneration) {
-        // Se precisa gerar, fazer a geração
-        console.log(`📄 Gerando PDF para plano: ${plan.id}`)
-        const generateResponse = await dashboardAPI.generatePlanPDF(plan.id)
-        
-        // Abrir o PDF em nova aba
-        window.open(generateResponse.pdfUrl, '_blank')
-      } else if (pdfResponse.pdfUrl) {
-        // Se já existe, abrir diretamente
-        console.log(`📄 Abrindo PDF existente: ${pdfResponse.pdfUrl}`)
-        window.open(pdfResponse.pdfUrl, '_blank')
-      } else {
-        console.error('❌ Não foi possível obter URL do PDF')
-        alert('Erro ao carregar o PDF. Tente novamente.')
-      }
-    } catch (error) {
-      console.error('❌ Erro ao visualizar PDF:', error)
-      alert('Erro ao carregar o PDF. Tente novamente.')
-    } finally {
-      setGeneratingPDF(null)
-    }
+  const handleViewPlan = (plan: Plan) => {
+    setSelectedPlanId(plan.id)
+    setIsPlanModalOpen(true)
+  }
+
+  const closePlanModal = () => {
+    setIsPlanModalOpen(false)
+    setSelectedPlanId(null)
   }
 
   if (loading) {
@@ -541,31 +523,14 @@ const ClientProfile: React.FC = () => {
                         
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleViewPDF(plan)}
-                            disabled={generatingPDF === plan.id}
-                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 transition-all duration-200 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => handleViewPlan(plan)}
+                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 transition-all duration-200 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 hover:border-blue-300"
                           >
-                            {generatingPDF === plan.id ? (
-                              <>
-                                <div className="w-4 h-4 mr-2 border-2 border-blue-300 rounded-full border-t-blue-600 animate-spin"></div>
-                                Gerando...
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                Ver PDF
-                              </>
-                            )}
-                          </button>
-                          
-                          <button className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 transition-all duration-200 border border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100 hover:border-gray-300">
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
-                            Detalhes
+                            Ver Plano
                           </button>
                         </div>
                       </div>
@@ -643,6 +608,15 @@ const ClientProfile: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Plan View Modal */}
+      {selectedPlanId && (
+        <PlanViewModal
+          planId={selectedPlanId}
+          isOpen={isPlanModalOpen}
+          onClose={closePlanModal}
+        />
+      )}
     </div>
   )
 }

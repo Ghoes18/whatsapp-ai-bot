@@ -56,11 +56,24 @@ export interface Plan {
   id: string;
   client_id: string;
   type: string;
-  pdf_url: string;
+  plan_content: string;
+  pdf_url?: string;
   created_at: string;
   expires_at?: string;
   status: 'active' | 'expired' | 'completed';
-  content?: string;
+}
+
+export interface PlanContent {
+  id: string;
+  client_id: string;
+  type: string;
+  plan_content: string;
+  created_at: string;
+  expires_at?: string;
+  client: {
+    name: string;
+    phone: string;
+  };
 }
 
 export interface ClientStats {
@@ -177,6 +190,10 @@ export const dashboardAPI = {
 
   getPlanPDF: (planId: string): Promise<{ pdfUrl?: string; needsGeneration?: boolean }> =>
     api.get(`/plans/${planId}/pdf`).then(response => response.data),
+
+  // Conteúdo dos Planos
+  getPlanContent: (planId: string): Promise<{ plan: PlanContent }> =>
+    api.get(`/plans/${planId}/content`).then(response => response.data),
 };
 
 export default api; 

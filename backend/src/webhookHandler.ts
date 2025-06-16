@@ -211,7 +211,8 @@ async function handleStartState(from: string, clientId: string) {
       console.log("Erro ao criar conversa:", newConvError);
       return;
     }
-    const message = "Olá! Qual o seu nome?";
+    await sendWhatsappMessage(from, "Olá! Sou a IA da FitAI. Irei lhe atender da forma mais rápida e eficiente possível, para conseguirmos lhe dar o nosso melhor serviço.");
+    const message = "Para começarmos, qual é o seu primeiro e último nome?";
     await sendWhatsappMessage(from, message);
     await saveAssistantMessage(clientId, message);
   } catch (error) {

@@ -62,9 +62,10 @@ CREATE TABLE public.plans (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   client_id uuid,
   type text NOT NULL,
-  pdf_url text NOT NULL,
+  pdf_url text,
   created_at timestamp with time zone DEFAULT now(),
   expires_at timestamp with time zone,
+  plan_content text NOT NULL,
   CONSTRAINT plans_pkey PRIMARY KEY (id),
   CONSTRAINT plans_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
 );

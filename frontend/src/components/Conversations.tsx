@@ -128,6 +128,7 @@ const Conversations: React.FC = () => {
   const markReadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastMarkedReadRef = useRef<string | null>(null)
   const messagesCacheRef = useRef<{ [clientId: string]: { messages: Message[]; timestamp: number } }>({})
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const CACHE_DURATION = 5000
 
   const isCacheValid = (clientId: string) => {
@@ -299,6 +300,17 @@ const Conversations: React.FC = () => {
     })
   }
 
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`
+    }
+  }
+
+  useEffect(() => {
+    adjustTextareaHeight()
+  }, [newMessage])
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedClient || isSendingMessage) return
 
@@ -331,7 +343,7 @@ const Conversations: React.FC = () => {
     }
   }
 
-  const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setNewMessage(e.target.value)
   }
 
@@ -541,7 +553,7 @@ const Conversations: React.FC = () => {
                             : "bg-white border border-gray-200 text-gray-900"
                         }`}
                       >
-                        <p className="text-sm leading-relaxed">{message.content}</p>
+                        <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
                         <div
                           className={`flex items-center justify-end mt-2 ${
                             message.role === "assistant" ? "text-blue-100" : "text-gray-500"
@@ -583,14 +595,15 @@ const Conversations: React.FC = () => {
                     <ImageIcon className="w-5 h-5" />
                   </button>
                   <div className="relative flex-1">
-                    <input
-                      type="text"
+                    <textarea
+                      ref={textareaRef}
                       value={newMessage}
                       onChange={handleMessageChange}
                       onKeyPress={handleKeyPress}
                       placeholder="Digite sua mensagem..."
                       disabled={isSendingMessage}
-                      className="w-full px-4 py-3 transition-all duration-200 border border-gray-200 rounded-xl bg-white/70 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 hover:bg-white focus:bg-white"
+                      rows={1}
+                      className="w-full px-4 py-3 transition-all duration-200 border border-gray-200 resize-none rounded-xl bg-white/70 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 hover:bg-white focus:bg-white"
                     />
                   </div>
                   <button

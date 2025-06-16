@@ -60,11 +60,11 @@ export interface Plan {
   id: string;
   client_id: string;
   type: string;
-  pdf_url: string;
+  plan_content: string;
+  pdf_url?: string;
   created_at: string;
   expires_at?: string;
   status: "active" | "expired" | "completed";
-  content?: string;
 }
 
 export interface RecentActivity {
@@ -79,39 +79,43 @@ export interface RecentActivity {
 
 // Listar todos os clientes com última mensagem
 export async function getAllClients(): Promise<Client[]> {
-  const { data: clients, error: clientError } = await supabase
-    .from("clients")
-    .select("*")
-    .order("created_at", { ascending: false });
+  try {
+    const { data: clients, error: clientError } = await supabase
+      .from("clients")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-  if (clientError) {
-    console.error("Erro ao buscar clientes:", clientError);
-    throw clientError;
+    if (clientError) {
+      throw clientError;
+    }
+    
+    const clientsWithLastMessage = await Promise.all(
+      clients.map(async (client: Client) => {
+        const { data: lastMessage } = await supabase
+          .from("chat_messages")
+          .select("created_at")
+          .eq("client_id", client.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        return {
+          ...client,
+          last_message_at: lastMessage?.created_at || client.created_at,
+        };
+      })
+    );
+
+    // Ordenar por data da última mensagem
+    clientsWithLastMessage.sort((a, b) => {
+      return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
+    });
+
+    return clientsWithLastMessage;
+  } catch (error) {
+    console.error("Erro ao buscar clientes:", error);
+    throw error;
   }
-  
-  const clientsWithLastMessage = await Promise.all(
-    clients.map(async (client: Client) => {
-      const { data: lastMessage } = await supabase
-        .from("chat_messages")
-        .select("created_at")
-        .eq("client_id", client.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      return {
-        ...client,
-        last_message_at: lastMessage?.created_at || client.created_at,
-      };
-    })
-  );
-
-  // Ordenar por data da última mensagem
-  clientsWithLastMessage.sort((a, b) => {
-    return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
-  });
-
-  return clientsWithLastMessage;
 }
 
 // Obter histórico completo de uma conversa
@@ -369,24 +373,36 @@ async function fetchPlanData(planId: string, includeContent: boolean = false): P
 
 // Helper function to process approved plan
 async function processApprovedPlan(plan: any): Promise<void> {
-  console.log(`📋 DEBUG: Dados do plano encontrados:`, {
-    client_id: plan.client_id,
-    plan_content_length: plan.plan_content?.length ?? 0,
-    client_phone: plan.client?.phone,
-    client_name: plan.client?.name
-  });
+  try {
+    // Salvar plano na tabela plans
+    const savedPlanId = await saveApprovedPlan(plan.client_id, plan.plan_content);
+    
+    // Enviar mensagem para o cliente
+    const message = `✅ Seu plano foi aprovado e está pronto!\n\n${plan.plan_content}`;
+    
+    // Salvar mensagem na tabela chat_messages
+    const { error: messageError } = await supabase
+      .from("chat_messages")
+      .insert([
+        {
+          client_id: plan.client_id,
+          role: "assistant",
+          content: message,
+        },
+      ]);
 
-  // Salvar plano na tabela plans
-  console.log('💾 Salvando plano na tabela plans...');
-  const savedPlanId = await saveApprovedPlan(plan.client_id, plan.plan_content);
-  console.log(`✅ Plano salvo na tabela plans com ID: ${savedPlanId}`);
-  
-  // Enviar mensagem para o cliente
-  const message = `✅ Seu plano foi aprovado e está pronto!\n\n${plan.plan_content}`;
-  console.log(`📱 Enviando mensagem para: ${plan.client.phone}`);
-  await sendWhatsappMessage(plan.client.phone, message);
-  
-  console.log(`✅ Plano enviado com sucesso para ${plan.client.phone}`);
+    if (messageError) {
+      console.error("Erro ao salvar mensagem do plano:", messageError);
+      throw messageError;
+    }
+    
+    // Enviar mensagem via WhatsApp
+    await sendWhatsappMessage(plan.client.phone, message);
+    
+  } catch (error) {
+    console.error("Erro ao processar plano aprovado:", error);
+    throw error;
+  }
 }
 
 // Helper function to notify rejected plan
@@ -394,25 +410,40 @@ async function notifyRejectedPlan(plan: any): Promise<void> {
   const clientPhone = plan.client?.phone;
   const clientName = plan.client?.name;
   
-  console.log(`📋 DEBUG: Notificando cliente: ${clientPhone} (${clientName})`);
-  
-  // Notificar cliente sobre rejeição
-  await sendWhatsappMessage(
-    clientPhone,
-    `Olá ${clientName || 'Cliente'}! O seu plano está a ser revisto pela nossa equipa.`
-  );
-  
-  await sendWhatsappMessage(
-    clientPhone,
-    '📋 Estamos a fazer algumas melhorias para garantir a melhor qualidade possível.'
-  );
-  
-  await sendWhatsappMessage(
-    clientPhone,
-    '⏰ Receberá o seu plano personalizado em breve. Obrigado pela paciência!'
-  );
+  try {
+    // Mensagens de notificação
+    const messages = [
+      `Olá ${clientName || 'Cliente'}! O seu plano está a ser revisto pela nossa equipa.`,
+      '📋 Estamos a fazer algumas melhorias para garantir a melhor qualidade possível.',
+      '⏰ Receberá o seu plano personalizado em breve. Obrigado pela paciência!'
+    ];
 
-  console.log(`✅ Cliente ${plan.client_id} notificado sobre revisão do plano`);
+    // Salvar e enviar cada mensagem
+    for (const message of messages) {
+      // Salvar na tabela chat_messages
+      const { error: messageError } = await supabase
+        .from("chat_messages")
+        .insert([
+          {
+            client_id: plan.client_id,
+            role: "assistant",
+            content: message,
+          },
+        ]);
+
+      if (messageError) {
+        console.error("Erro ao salvar mensagem de notificação:", messageError);
+        throw messageError;
+      }
+
+      // Enviar via WhatsApp
+      await sendWhatsappMessage(clientPhone, message);
+    }
+
+  } catch (error) {
+    console.error("Erro ao notificar cliente sobre rejeição:", error);
+    throw error;
+  }
 }
 
 // Aprovar/rejeitar plano
@@ -421,28 +452,41 @@ export async function updatePlanStatus(
   status: "approved" | "rejected",
   editedContent?: string
 ): Promise<void> {
-  console.log(`🔍 DEBUG: Atualizando status do plano ${planId} para ${status}`);
-  
-  // Update plan status in database
-  await updatePlanStatusInDB(planId, status, editedContent);
+  try {
+    // Update plan status in database
+    await updatePlanStatusInDB(planId, status, editedContent);
 
-  // Process based on status
-  if (status === "approved") {
-    console.log('🔄 Plano aprovado, processando envio para o cliente...');
-    const plan = await fetchPlanData(planId, true);
-    await processApprovedPlan(plan);
-  } else if (status === "rejected") {
-    console.log('🔄 Plano rejeitado, notificando cliente...');
-    const plan = await fetchPlanData(planId, false);
-    await notifyRejectedPlan(plan);
+    // Process based on status
+    if (status === "approved") {
+      const plan = await fetchPlanData(planId, true);
+      await processApprovedPlan(plan);
+    } else if (status === "rejected") {
+      const plan = await fetchPlanData(planId, false);
+      await notifyRejectedPlan(plan);
+    }
+  } catch (error) {
+    console.error(`Erro ao atualizar status do plano ${planId}:`, error);
+    throw error;
   }
 }
 
 // Salvar plano aprovado na tabela plans
 export async function saveApprovedPlan(clientId: string, planContent: string): Promise<string> {
   try {
-    console.log(`🔍 DEBUG: Salvando plano aprovado para cliente: ${clientId}`);
-    console.log(`📋 DEBUG: Conteúdo do plano: ${planContent.substring(0, 100)}...`);
+    // Verificar se o cliente existe
+    const { data: client, error: clientError } = await supabase
+      .from("clients")
+      .select("id, phone, name")
+      .eq("id", clientId)
+      .single();
+
+    if (clientError) {
+      throw clientError;
+    }
+
+    if (!client) {
+      throw new Error("Cliente não encontrado");
+    }
     
     // Determinar o tipo do plano baseado no conteúdo
     let planType = "Geral";
@@ -452,98 +496,32 @@ export async function saveApprovedPlan(clientId: string, planContent: string): P
       planType = "Nutrição";
     }
 
-    console.log(`📊 DEBUG: Tipo do plano determinado: ${planType}`);
-
     // Calcular data de expiração (30 dias a partir de agora)
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
-    console.log(`📅 DEBUG: Data de expiração: ${expiresAt.toISOString()}`);
+    // Preparar dados para inserção
+    const planData = {
+      client_id: clientId,
+      type: planType,
+      plan_content: planContent,
+      expires_at: expiresAt.toISOString(),
+    };
 
-    // Primeiro, inserir o plano com URL temporária
-    const tempPdfUrl = `temp-plan-${Date.now()}.pdf`;
-
+    // Inserir o plano com o conteúdo diretamente
     const { data, error } = await supabase
       .from("plans")
-      .insert({
-        client_id: clientId,
-        type: planType,
-        pdf_url: tempPdfUrl, // URL temporária para satisfazer a constraint NOT NULL
-        expires_at: expiresAt.toISOString(),
-      })
+      .insert(planData)
       .select("id")
       .single();
 
     if (error) {
-      console.error("❌ Erro ao salvar plano aprovado:", error);
       throw error;
     }
-
-    console.log(`✅ Plano salvo com sucesso! ID: ${data.id}`);
-
-    // Agora gerar o PDF e atualizar a URL
-    try {
-      console.log('📄 Gerando PDF do plano...');
-      
-      // Buscar dados do cliente para o contexto
-      const { data: client } = await supabase
-        .from('clients')
-        .select('name, age, gender, height, weight, goal')
-        .eq('id', clientId)
-        .single();
-
-      const clientContext = {
-        name: client?.name,
-        age: client?.age?.toString(),
-        gender: client?.gender,
-        height: client?.height?.toString(),
-        weight: client?.weight?.toString(),
-        goal: client?.goal,
-      };
-
-      // Importar e usar o serviço de PDF
-      const { generateAndUploadPlanPDF } = await import('./pdfService');
-      
-      const planData = {
-        id: data.id,
-        client_id: clientId,
-        type: planType,
-        content: planContent,
-        created_at: new Date().toISOString(),
-        expires_at: expiresAt.toISOString(),
-      };
-
-      const pdfUrl = await generateAndUploadPlanPDF(planData, clientContext);
-      
-      // Atualizar o plano com a URL real do PDF
-      const { error: updateError } = await supabase
-        .from("plans")
-        .update({ pdf_url: pdfUrl })
-        .eq("id", data.id);
-
-      if (updateError) {
-        console.error("❌ Erro ao atualizar URL do PDF:", updateError);
-        // Não falhar se não conseguir atualizar a URL
-      } else {
-        console.log(`✅ URL do PDF atualizada: ${pdfUrl}`);
-      }
-
-    } catch (pdfError) {
-      console.error("❌ Erro ao gerar PDF:", pdfError);
-      // Não falhar se não conseguir gerar o PDF, manter a URL temporária
-    }
-
-    console.log(`📋 DEBUG: Dados inseridos:`, {
-      client_id: clientId,
-      type: planType,
-      pdf_url: tempPdfUrl,
-      expires_at: expiresAt.toISOString(),
-      id: data.id
-    });
     
     return data.id;
   } catch (error) {
-    console.error("❌ Erro ao salvar plano aprovado:", error);
+    console.error("Erro ao salvar plano aprovado:", error);
     throw error;
   }
 }
@@ -569,58 +547,83 @@ export async function getClientById(clientId: string): Promise<Client | null> {
 
 // Obter estatísticas do cliente
 export async function getClientStats(clientId: string) {
-  // Contar mensagens
-  const { count: messageCount } = await supabase
-    .from("chat_messages")
-    .select("*", { count: "exact", head: true })
-    .eq("client_id", clientId);
+  try {
+    // Contar mensagens
+    const { count: messageCount, error: messageError } = await supabase
+      .from("chat_messages")
+      .select("*", { count: "exact", head: true })
+      .eq("client_id", clientId);
 
-  // Contar planos
-  const { count: planCount } = await supabase
-    .from("plans")
-    .select("*", { count: "exact", head: true })
-    .eq("client_id", clientId);
+    if (messageError) {
+      console.error("Erro ao contar mensagens:", messageError);
+    }
 
-  // Última atividade
-  const { data: lastMessage } = await supabase
-    .from("chat_messages")
-    .select("created_at")
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+    // Contar planos
+    const { count: planCount, error: planError } = await supabase
+      .from("plans")
+      .select("*", { count: "exact", head: true })
+      .eq("client_id", clientId);
 
-  return {
-    totalMessages: messageCount || 0,
-    plansReceived: planCount || 0,
-    lastActivity: lastMessage?.created_at || null,
-  };
+    if (planError) {
+      console.error("Erro ao contar planos:", planError);
+    }
+
+    // Última atividade
+    const { data: lastMessage } = await supabase
+      .from("chat_messages")
+      .select("created_at")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    return {
+      totalMessages: messageCount || 0,
+      plansReceived: planCount || 0,
+      lastActivity: lastMessage?.created_at || null,
+    };
+  } catch (error) {
+    console.error("Erro ao buscar estatísticas do cliente:", error);
+    return {
+      totalMessages: 0,
+      plansReceived: 0,
+      lastActivity: null,
+    };
+  }
 }
 
 // Obter histórico de planos de um cliente
 export async function getClientPlans(clientId: string): Promise<Plan[]> {
   try {
-    console.log(`🔍 Buscando planos para cliente: ${clientId}`);
+    // Primeiro, verificar se o cliente existe
+    const { data: client, error: clientError } = await supabase
+      .from("clients")
+      .select("id, phone, name")
+      .eq("id", clientId)
+      .single();
+
+    if (clientError) {
+      throw clientError;
+    }
+
+    if (!client) {
+      return [];
+    }
     
+    // Buscar planos
     const { data: plans, error } = await supabase
       .from("plans")
-      .select("*")
+      .select("id, client_id, type, plan_content, pdf_url, created_at, expires_at")
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });
 
-    console.log(`📊 Resultado da consulta:`, { plans, error });
-
     if (error) {
-      console.error("❌ Erro ao buscar planos do cliente:", error);
       throw error;
     }
 
     if (!plans) {
-      console.log("📭 Nenhum plano encontrado (plans é null/undefined)");
       return [];
     }
-
-    console.log(`📋 Encontrados ${plans.length} planos para o cliente`);
 
     // Processar status dos planos baseado na data de expiração
     const processedPlans = plans.map((plan: any) => {
@@ -641,11 +644,62 @@ export async function getClientPlans(clientId: string): Promise<Plan[]> {
       };
     });
 
-    console.log(`✅ Retornando ${processedPlans.length} planos processados`);
     return processedPlans;
   } catch (error) {
-    console.error("❌ Erro ao buscar planos do cliente:", error);
+    console.error("Erro ao buscar planos do cliente:", error);
     return [];
+  }
+}
+
+// Obter conteúdo de um plano específico
+export async function getPlanContent(planId: string): Promise<any> {
+  try {
+    const { data: plan, error } = await supabase
+      .from("plans")
+      .select(`
+        id,
+        client_id,
+        type,
+        plan_content,
+        created_at,
+        expires_at,
+        client:clients(name, phone)
+      `)
+      .eq("id", planId)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!plan) {
+      throw new Error("Plano não encontrado");
+    }
+
+    // Processar status do plano baseado na data de expiração
+    let status: "active" | "expired" | "completed" = "active";
+    if (plan.expires_at) {
+      const now = new Date();
+      const expiresAt = new Date(plan.expires_at);
+      
+      if (now > expiresAt) {
+        status = "expired";
+      }
+    }
+
+    return {
+      id: plan.id,
+      client_id: plan.client_id,
+      type: plan.type,
+      plan_content: plan.plan_content,
+      created_at: plan.created_at,
+      expires_at: plan.expires_at,
+      client: plan.client,
+      status
+    };
+  } catch (error) {
+    console.error("Erro ao buscar conteúdo do plano:", error);
+    throw error;
   }
 }
 
@@ -653,29 +707,45 @@ export async function getClientPlans(clientId: string): Promise<Plan[]> {
 export async function getDashboardStats() {
   try {
     // Total de clientes
-    const { count: totalClients } = await supabase
+    const { count: totalClients, error: clientsError } = await supabase
       .from("clients")
       .select("*", { count: "exact", head: true });
 
+    if (clientsError) {
+      console.error("Erro ao contar clientes:", clientsError);
+    }
+
     // Conversas ativas (clientes com AI ativa)
-    const { count: activeConversations } = await supabase
+    const { count: activeConversations, error: activeError } = await supabase
       .from("clients")
       .select("*", { count: "exact", head: true })
       .eq("ai_enabled", true);
 
+    if (activeError) {
+      console.error("Erro ao contar conversas ativas:", activeError);
+    }
+
     // Planos pendentes
-    const { count: pendingPlans } = await supabase
+    const { count: pendingPlans, error: pendingError } = await supabase
       .from("pending_plans")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending");
 
+    if (pendingError) {
+      console.error("Erro ao contar planos pendentes:", pendingError);
+    }
+
     // Mensagens de hoje
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const { count: todayMessages } = await supabase
+    const { count: todayMessages, error: messagesError } = await supabase
       .from("chat_messages")
       .select("*", { count: "exact", head: true })
       .gte("created_at", today.toISOString());
+
+    if (messagesError) {
+      console.error("Erro ao contar mensagens de hoje:", messagesError);
+    }
 
     return {
       totalClients: totalClients || 0,
@@ -714,15 +784,23 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
       .limit(3);
 
     // Planos pendentes recentes
-    const { data: recentPlansData } = await supabase
+    const { data: recentPendingPlansData } = await supabase
       .from("pending_plans")
       .select("id, created_at, client_id")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(2);
 
-    const recentPlans = recentPlansData ? await Promise.all(
-      recentPlansData.map(async (plan: any) => {
+    // Planos aprovados recentes (da tabela plans)
+    const { data: recentApprovedPlansData } = await supabase
+      .from("plans")
+      .select("id, created_at, client_id")
+      .order("created_at", { ascending: false })
+      .limit(2);
+
+    // Processar planos pendentes
+    const recentPendingPlans = recentPendingPlansData ? await Promise.all(
+      recentPendingPlansData.map(async (plan: any) => {
         const { data: client } = await supabase
           .from('clients')
           .select('phone, name')
@@ -732,6 +810,24 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
           id: plan.id,
           created_at: plan.created_at,
           clients: client ? [client] : [{phone: 'N/A', name: 'N/A'}],
+          type: 'pending'
+        };
+      })
+    ) : [];
+
+    // Processar planos aprovados
+    const recentApprovedPlans = recentApprovedPlansData ? await Promise.all(
+      recentApprovedPlansData.map(async (plan: any) => {
+        const { data: client } = await supabase
+          .from('clients')
+          .select('phone, name')
+          .eq('id', plan.client_id)
+          .single();
+        return {
+          id: plan.id,
+          created_at: plan.created_at,
+          clients: client ? [client] : [{phone: 'N/A', name: 'N/A'}],
+          type: 'approved'
         };
       })
     ) : [];
@@ -760,17 +856,32 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
       });
     }
 
-    // Adicionar planos
-    if (recentPlans) {
-      recentPlans.forEach((plan: any) => {
+    // Adicionar planos pendentes
+    if (recentPendingPlans) {
+      recentPendingPlans.forEach((plan: any) => {
         activities.push({
-          id: `plan-${plan.id}`,
+          id: `pending-plan-${plan.id}`,
           clientPhone: plan.clients[0]?.phone || 'Unknown',
           clientName: plan.clients[0]?.name,
           type: "plan",
           content: "Novo plano pendente",
           timestamp: plan.created_at,
           status: "pending",
+        });
+      });
+    }
+
+    // Adicionar planos aprovados
+    if (recentApprovedPlans) {
+      recentApprovedPlans.forEach((plan: any) => {
+        activities.push({
+          id: `approved-plan-${plan.id}`,
+          clientPhone: plan.clients[0]?.phone || 'Unknown',
+          clientName: plan.clients[0]?.name,
+          type: "plan",
+          content: "Plano aprovado e enviado",
+          timestamp: plan.created_at,
+          status: "completed",
         });
       });
     }

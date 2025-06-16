@@ -14,7 +14,8 @@ import {
   getDashboardStats,
   getRecentActivity,
   getUnreadMessageCounts,
-  getClientPlans
+  getClientPlans,
+  getPlanContent
 } from './src/services/dashboardService';
 import { 
   sendWhatsappMessage, 
@@ -56,7 +57,6 @@ function invalidateCache(pattern?: string) {
 }
 
 const router = express.Router();
-
 
 // Rate limiting para endpoints de mensagens
 const messageRateLimit = rateLimit({
@@ -226,6 +226,36 @@ router.get('/clients/:clientId/plans', async (req, res) => {
   } catch (error) {
     console.error('Erro ao buscar planos do cliente:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Obter conteúdo de um plano específico
+router.get('/plans/:planId/content', async (req, res) => {
+  try {
+    const { planId } = req.params;
+    const cacheKey = `plan_content_${planId}`;
+    
+    // Verificar cache primeiro
+    const cachedPlan = getCachedData(cacheKey);
+    if (cachedPlan) {
+      console.log(`📋 Retornando conteúdo do plano do cache: ${planId}`);
+      return res.json({ plan: cachedPlan });
+    }
+    
+    console.log(`📋 Buscando conteúdo do plano no banco: ${planId}`);
+    const plan = await getPlanContent(planId);
+    
+    // Cachear resultado
+    setCachedData(cacheKey, plan);
+    
+    res.json({ plan });
+  } catch (error) {
+    console.error('Erro ao buscar conteúdo do plano:', error);
+    if (error instanceof Error && error.message === 'Plano não encontrado') {
+      res.status(404).json({ error: 'Plano não encontrado' });
+    } else {
+      res.status(500).json({ error: 'Erro interno do servidor' });
+    }
   }
 });
 
@@ -569,378 +599,6 @@ router.get('/performance-test/:clientId', async (req, res) => {
       error: 'Erro no teste de performance',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     });
-  }
-});
-
-// Debug endpoint para testar conectividade
-router.get('/debug', async (req, res) => {
-  try {
-    console.log('=== DEBUG ENDPOINT ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('ZAPI_URL:', process.env.ZAPI_URL ? 'Configurado' : 'NÃO CONFIGURADO');
-    console.log('ZAPI_CLIENT_TOKEN:', process.env.ZAPI_CLIENT_TOKEN ? 'Configurado' : 'NÃO CONFIGURADO');
-    
-    res.json({
-      status: 'OK',
-      timestamp: new Date().toISOString(),
-      cacheSize: cache.size,
-      environment: {
-        zapi_url_configured: !!process.env.ZAPI_URL,
-        zapi_token_configured: !!process.env.ZAPI_CLIENT_TOKEN,
-        node_env: process.env.NODE_ENV || 'development'
-      }
-    });
-  } catch (error) {
-    console.error('Erro no debug endpoint:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Endpoint para limpar cache (útil para debug e manutenção)
-router.post('/debug/clear-cache', (req, res) => {
-  try {
-    const cacheSize = cache.size;
-    cache.clear();
-    console.log(`🧹 Cache limpo: ${cacheSize} entradas removidas`);
-    
-    res.json({
-      success: true,
-      message: `Cache limpo com sucesso`,
-      entriesRemoved: cacheSize,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Erro ao limpar cache:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// ENDPOINT TEMPORÁRIO: Limpar mensagens com perfis de clientes misturadas
-router.post('/cleanup/messages', async (req, res) => {
-  try {
-    console.log('🧹 Iniciando limpeza de mensagens com perfis de clientes...');
-    
-    // Primeiro, buscar mensagens que contêm elementos típicos de planos/perfis
-    const { data: problematicMessages, error: fetchError } = await supabase
-      .from('chat_messages')
-      .select('id, content')
-      .or('content.ilike.%Cliente:%,content.ilike.%Nome:%,content.ilike.%Idade:%,content.ilike.%Género:%,content.ilike.%Altura:%,content.ilike.%Peso:%,content.ilike.%Objetivo:%,content.ilike.%Plano personalizado do cliente:%,content.ilike.%Plano de Treino%,content.ilike.%Dados do Cliente%');
-    
-    if (fetchError) {
-      console.error('Erro ao buscar mensagens problemáticas:', fetchError);
-      return res.status(500).json({ error: 'Erro ao buscar mensagens' });
-    }
-    
-    console.log(`Encontradas ${problematicMessages?.length || 0} mensagens problemáticas`);
-    
-    if (problematicMessages && problematicMessages.length > 0) {
-      // Mostrar algumas para debug
-      console.log('Exemplo de mensagem problemática:', problematicMessages[0]?.content?.substring(0, 200) + '...');
-      
-      // Deletar as mensagens problemáticas
-      const idsToDelete = problematicMessages.map((msg: { id: string }) => msg.id);
-      
-      const { error: deleteError } = await supabase
-        .from('chat_messages')
-        .delete()
-        .in('id', idsToDelete);
-      
-      if (deleteError) {
-        console.error('Erro ao deletar mensagens:', deleteError);
-        return res.status(500).json({ error: 'Erro ao deletar mensagens' });
-      }
-      
-      console.log(`✅ ${idsToDelete.length} mensagens problemáticas removidas`);
-      res.json({ 
-        success: true, 
-        message: `${idsToDelete.length} mensagens com perfis/planos removidas`,
-        deletedIds: idsToDelete
-      });
-    } else {
-      console.log('✅ Nenhuma mensagem problemática encontrada');
-      res.json({ success: true, message: 'Nenhuma mensagem problemática encontrada' });
-    }
-    
-  } catch (error) {
-    console.error('Erro ao limpar mensagens:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// ENDPOINT TEMPORÁRIO: Debug webhook - simular mensagem do WhatsApp
-router.post('/debug/webhook', async (req, res) => {
-  try {
-    console.log('🐛 Debug webhook chamado com body:', JSON.stringify(req.body, null, 2));
-    
-    // Reenviar para o webhook handler real
-    const webhookResponse = await fetch('http://localhost:3000/webhook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    
-    const result = await webhookResponse.text();
-    
-    res.json({ 
-      success: true, 
-      status: webhookResponse.status,
-      response: result,
-      originalBody: req.body
-    });
-  } catch (error) {
-    console.error('Erro no debug webhook:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Rota de debug para inserir plano de teste
-router.post('/debug/insert-test-plan', async (req, res) => {
-  try {
-    const { clientId } = req.body;
-    
-    if (!clientId) {
-      return res.status(400).json({ error: 'clientId é obrigatório' });
-    }
-
-    console.log(`🔍 DEBUG: Inserindo plano de teste para cliente: ${clientId}`);
-    
-    // Verificar se o cliente existe
-    const { data: client, error: clientError } = await supabase
-      .from('clients')
-      .select('id, phone, name')
-      .eq('id', clientId)
-      .single();
-
-    if (clientError || !client) {
-      console.error('❌ Cliente não encontrado:', clientError);
-      return res.status(404).json({ error: 'Cliente não encontrado' });
-    }
-
-    console.log(`✅ Cliente encontrado: ${client.phone} (${client.name})`);
-
-    // Conteúdo de teste para o plano
-    const testPlanContent = `Plano de Treino Personalizado
-
-Exercícios para ${client.name || 'Cliente'}:
-
-1. Aquecimento (10 minutos):
-   - Corrida leve
-   - Alongamentos dinâmicos
-
-2. Treino Principal (45 minutos):
-   - Agachamentos: 3 séries x 12 repetições
-   - Flexões: 3 séries x 10 repetições
-   - Prancha: 3 séries x 30 segundos
-
-3. Resfriamento (5 minutos):
-   - Alongamentos estáticos
-
-Frequência: 3x por semana
-Duração: 60 minutos por sessão
-
-Este é um plano de teste gerado automaticamente.`;
-
-    // Salvar como plano pendente primeiro
-    const pendingPlanId = await savePendingPlan(clientId, testPlanContent);
-    console.log(`✅ Plano pendente criado com ID: ${pendingPlanId}`);
-
-    // Aprovar o plano automaticamente
-    await updatePlanStatus(pendingPlanId, 'approved', testPlanContent);
-    console.log(`✅ Plano aprovado e salvo na tabela plans`);
-
-    res.json({ 
-      success: true, 
-      message: 'Plano de teste inserido e aprovado com sucesso',
-      pendingPlanId,
-      client: {
-        id: client.id,
-        phone: client.phone,
-        name: client.name
-      }
-    });
-  } catch (error) {
-    console.error('❌ Erro ao inserir plano de teste:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Rota de debug para listar todos os planos
-router.get('/debug/plans', async (req, res) => {
-  try {
-    console.log('🔍 DEBUG: Listando todos os planos...');
-    
-    const { data: plans, error } = await supabase
-      .from('plans')
-      .select(`
-        *,
-        client:clients(phone, name)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('❌ Erro ao listar planos:', error);
-      return res.status(500).json({ error: 'Erro ao listar planos' });
-    }
-
-    console.log(`📊 DEBUG: Encontrados ${plans?.length || 0} planos`);
-    
-    res.json({
-      success: true,
-      totalPlans: plans?.length || 0,
-      plans: plans || []
-    });
-  } catch (error) {
-    console.error('❌ Erro ao listar planos:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Rota de debug para listar planos pendentes
-router.get('/debug/pending-plans', async (req, res) => {
-  try {
-    console.log('🔍 DEBUG: Listando planos pendentes...');
-    
-    const { data: pendingPlans, error } = await supabase
-      .from('pending_plans')
-      .select(`
-        *,
-        client:clients(phone, name)
-      `)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('❌ Erro ao listar planos pendentes:', error);
-      return res.status(500).json({ error: 'Erro ao listar planos pendentes' });
-    }
-
-    console.log(`📊 DEBUG: Encontrados ${pendingPlans?.length || 0} planos pendentes`);
-    
-    res.json({
-      success: true,
-      totalPendingPlans: pendingPlans?.length || 0,
-      pendingPlans: pendingPlans || []
-    });
-  } catch (error) {
-    console.error('❌ Erro ao listar planos pendentes:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Gerar PDF de um plano específico
-router.post('/plans/:planId/generate-pdf', async (req, res) => {
-  try {
-    const { planId } = req.params;
-    
-    console.log(`🔍 Gerando PDF para plano: ${planId}`);
-    
-    // Buscar dados do plano
-    const { data: plan, error: planError } = await supabase
-      .from('plans')
-      .select(`
-        *,
-        client:clients(name, age, gender, height, weight, goal)
-      `)
-      .eq('id', planId)
-      .single();
-
-    if (planError || !plan) {
-      console.error('❌ Plano não encontrado:', planError);
-      return res.status(404).json({ error: 'Plano não encontrado' });
-    }
-
-    // Buscar conteúdo do plano (pode estar em pending_plans se foi aprovado recentemente)
-    const { data: pendingPlan } = await supabase
-      .from('pending_plans')
-      .select('plan_content')
-      .eq('client_id', plan.client_id)
-      .eq('status', 'approved')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    const planContent = pendingPlan?.plan_content || 'Conteúdo do plano não disponível';
-
-    const clientContext = {
-      name: plan.client?.name,
-      age: plan.client?.age?.toString(),
-      gender: plan.client?.gender,
-      height: plan.client?.height?.toString(),
-      weight: plan.client?.weight?.toString(),
-      goal: plan.client?.goal,
-    };
-
-    // Importar e usar o serviço de PDF
-    const { generateAndUploadPlanPDF } = await import('./src/services/pdfService');
-    
-    const planData = {
-      id: plan.id,
-      client_id: plan.client_id,
-      type: plan.type,
-      content: planContent,
-      created_at: plan.created_at,
-      expires_at: plan.expires_at,
-    };
-
-    const pdfUrl = await generateAndUploadPlanPDF(planData, clientContext);
-    
-    // Atualizar o plano com a nova URL do PDF
-    const { error: updateError } = await supabase
-      .from('plans')
-      .update({ pdf_url: pdfUrl })
-      .eq('id', planId);
-
-    if (updateError) {
-      console.error('❌ Erro ao atualizar URL do PDF:', updateError);
-    }
-
-    res.json({ 
-      success: true, 
-      pdfUrl,
-      message: 'PDF gerado com sucesso'
-    });
-  } catch (error) {
-    console.error('❌ Erro ao gerar PDF:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Visualizar PDF de um plano
-router.get('/plans/:planId/pdf', async (req, res) => {
-  try {
-    const { planId } = req.params;
-    
-    console.log(`🔍 Buscando PDF para plano: ${planId}`);
-    
-    // Buscar dados do plano
-    const { data: plan, error: planError } = await supabase
-      .from('plans')
-      .select('pdf_url')
-      .eq('id', planId)
-      .single();
-
-    if (planError || !plan) {
-      console.error('❌ Plano não encontrado:', planError);
-      return res.status(404).json({ error: 'Plano não encontrado' });
-    }
-
-    if (!plan.pdf_url || plan.pdf_url.startsWith('temp-')) {
-      console.log('📄 PDF não encontrado ou temporário, redirecionando para geração...');
-      return res.json({ 
-        needsGeneration: true,
-        message: 'PDF precisa ser gerado'
-      });
-    }
-
-    // Redirecionar para a URL do PDF
-    res.json({ 
-      success: true,
-      pdfUrl: plan.pdf_url,
-      message: 'PDF encontrado'
-    });
-  } catch (error) {
-    console.error('❌ Erro ao buscar PDF:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
