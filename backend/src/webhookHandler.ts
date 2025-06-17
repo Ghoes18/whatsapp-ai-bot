@@ -1,6 +1,6 @@
 import { Request, Response, RequestHandler } from "express";
 import dotenv from "dotenv";
-import { sendWhatsappMessage } from "./services/zapi";
+import { sendWhatsappMessage, sendButtonList, sendList, sendButtonWithImage } from "./services/zapi";
 import { generateTrainingAndNutritionPlan, askQuestionToAI } from './services/openaiService';
 import { generatePlanPDF } from './services/pdfService';
 import { getOrCreateClient, getActiveConversation, updateConversationContext, updateClientAfterPayment, supabase, savePlanText } from './services/supabaseService';
@@ -17,6 +17,14 @@ const STATES = {
 } as const;
 type State = typeof STATES[keyof typeof STATES];
 
+// Constantes para perguntas com botões
+const BUTTON_QUESTIONS = {
+  GENDER: "gender",
+  EXPERIENCE: "experience",
+  AVAILABLE_DAYS: "available_days",
+  EXERCISE_PREFERENCES: "exercise_preferences",
+} as const;
+
 interface ClientContext {
   name?: string;
   age?: string;
@@ -31,6 +39,7 @@ interface ClientContext {
   dietary_restrictions?: string;
   equipment?: string;
   motivation?: string;
+  currentQuestion?: string;
   [key: string]: any;
 }
 
@@ -45,12 +54,10 @@ async function saveAssistantMessage(clientId: string, content: string) {
     ]);
 
     if (messageError) {
-      console.error("Erro ao salvar mensagem do assistente:", messageError);
-    } else {
-      console.log('Mensagem do assistente salva com sucesso');
+      console.error("❌ Erro ao salvar mensagem do assistente:", messageError);
     }
   } catch (error) {
-    console.error('Erro ao salvar mensagem do assistente:', error);
+    console.error('❌ Erro ao salvar mensagem do assistente:', error);
   }
 }
 
@@ -58,39 +65,29 @@ async function saveAssistantMessage(clientId: string, content: string) {
 export const handleWebhook: RequestHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log("=== WEBHOOK RECEBIDO ===");
-    console.log("Headers:", req.headers);
-    console.log("Body completo:", JSON.stringify(req.body, null, 2));
 
     // Tentar diferentes estruturas de mensagem que o ZAPI pode enviar
     let message = req.body.message;
     
     // Se não encontrou 'message', tentar outras estruturas possíveis
     if (!message) {
-      console.log("❌ Campo 'message' não encontrado, tentando estruturas alternativas...");
-      
       // Verificar se é uma estrutura direta
       if (req.body.phone || req.body.from || req.body.remoteJid) {
         message = req.body;
-        console.log("✅ Usando req.body diretamente como mensagem");
       }
       // Verificar outras possíveis estruturas
       else if (req.body.data?.message) {
         message = req.body.data.message;
-        console.log("✅ Encontrado em req.body.data.message");
       }
       else if (req.body.webhook?.message) {
         message = req.body.webhook.message;
-        console.log("✅ Encontrado em req.body.webhook.message");
       }
       else {
-        console.log("❌ ERRO: Estrutura de mensagem não reconhecida");
-        console.log("Campos disponíveis no body:", Object.keys(req.body));
+        console.log("❌ Estrutura de mensagem não reconhecida");
         res.status(400).send("Estrutura de mensagem inválida");
         return;
       }
     }
-
-    console.log("📱 Mensagem processada:", JSON.stringify(message, null, 2));
 
     // Extrair dados principais com mais flexibilidade
     const from: string | undefined = 
@@ -100,19 +97,52 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
       message.sender ||
       message.chatId;
       
-    const text: string = 
+    let text: string = 
       message.text?.message || 
       message.body || 
       message.content ||
       message.text ||
       message.message ||
       '';
+    
+    // Verificar se é uma resposta de botão
+    const buttonResponse = 
+      message.buttonsResponseMessage?.buttonId ||
+      message.buttonResponse ||
+      message.button?.response ||
+      message.response?.button ||
+      message.data?.buttonResponse ||
+      message.webhook?.buttonResponse;
 
-    console.log("📋 Dados extraídos:", { from, text });
+    // Verificar se é uma resposta de lista
+    const listResponse = 
+      message.listResponseMessage?.rowId ||
+      message.listResponse?.rowId ||
+      message.response?.list?.rowId ||
+      message.data?.listResponse?.rowId ||
+      message.webhook?.listResponse?.rowId;
+
+    if (buttonResponse) {
+      console.log("🎯 Botão clicado:", buttonResponse);
+      text = buttonResponse;
+    } else if (listResponse) {
+      console.log("📋 Lista selecionada:", listResponse);
+      text = listResponse;
+    }
+
+    // Log adicional para debug de respostas
+    if (message.buttonsResponseMessage || message.listResponseMessage) {
+      console.log("🔍 Estrutura da resposta:", JSON.stringify({
+        buttonsResponse: message.buttonsResponseMessage,
+        listResponse: message.listResponseMessage
+      }, null, 2));
+    }
+
+    console.log("📱 De:", from, "| Texto:", text);
 
     // Verificar se é realmente uma mensagem de texto (ignorar status, typing, etc.)
     if (message.messageType && message.messageType !== 'textMessage') {
-      console.log(`📄 Ignorando mensagem do tipo: ${message.messageType}`);
+      console.log(`📄 Ignorando tipo: ${message.messageType}`);
       res.status(200).send("Tipo de mensagem não suportado");
       return;
     }
@@ -122,14 +152,13 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
     const bodyStatusToIgnore = req.body.status && ['SENT', 'DELIVERED', 'READ'].includes(req.body.status);
     
     if (statusToIgnore || bodyStatusToIgnore || message.ack) {
-      console.log(`📊 Ignorando webhook de status: ${message.status || req.body.status || 'ACK'}`);
+      console.log(`📊 Status ignorado: ${message.status || req.body.status || 'ACK'}`);
       res.status(200).send("Status de mensagem ignorado");
       return;
     }
 
     if (!from) {
-      console.log("❌ ERRO: Número do remetente não encontrado na mensagem");
-      console.log("Campos tentados: phone, from, remoteJid, sender, chatId");
+      console.log("❌ Número do remetente não encontrado");
       res.status(400).send("Número do remetente não encontrado");
       return;
     }
@@ -152,10 +181,9 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
           content: text,
         },
       ]);
-      if (messageError) console.error("Erro ao salvar mensagem recebida:", messageError);
-      else console.log('Mensagem recebida salva com sucesso');
+      if (messageError) console.error("❌ Erro ao salvar mensagem recebida:", messageError);
     } catch (error) {
-      console.error('Erro ao salvar mensagem recebida:', error);
+      console.error('❌ Erro ao salvar mensagem recebida:', error);
     }
 
     if (!client.ai_enabled) {
@@ -208,15 +236,16 @@ async function handleStartState(from: string, clientId: string) {
       .select()
       .single();
     if (newConvError) {
-      console.log("Erro ao criar conversa:", newConvError);
+      console.log("❌ Erro ao criar conversa:", newConvError);
       return;
     }
+    console.log("🚀 Iniciando conversa com cliente:", from);
     await sendWhatsappMessage(from, "Olá! Sou a IA da FitAI. Irei lhe atender da forma mais rápida e eficiente possível, para conseguirmos lhe dar o nosso melhor serviço.");
     const message = "Para começarmos, qual é o seu primeiro e último nome?";
     await sendWhatsappMessage(from, message);
     await saveAssistantMessage(clientId, message);
   } catch (error) {
-    console.log("Erro no estado START:", error);
+    console.log("❌ Erro no estado START:", error);
   }
 }
 
@@ -224,6 +253,78 @@ async function handleStartState(from: string, clientId: string) {
 async function handleWaitingForInfo(from: string, text: string, conversation: any) {
   try {
     const context: ClientContext = conversation?.context || {};
+    
+    // Verificar se é uma resposta de botão válida
+    const currentQuestion = context.currentQuestion;
+    if (currentQuestion && isValidButtonResponse(currentQuestion, text)) {
+      // Processar resposta válida do botão
+      const mappedValue = mapButtonIdToValue(currentQuestion, text);
+      
+      switch (currentQuestion) {
+        case BUTTON_QUESTIONS.GENDER:
+          context.gender = mappedValue;
+          context.currentQuestion = undefined;
+          await updateConversationContext(conversation?.id, context);
+          const message = "Qual sua altura em cm? (ex: 175)";
+          await sendWhatsappMessage(from, message);
+          await saveAssistantMessage(conversation.client_id, message);
+          break;
+          
+        case BUTTON_QUESTIONS.EXPERIENCE:
+          context.experience = mappedValue;
+          context.currentQuestion = undefined;
+          await updateConversationContext(conversation?.id, context);
+          await sendAvailableDaysQuestion(from, conversation.client_id);
+          context.currentQuestion = BUTTON_QUESTIONS.AVAILABLE_DAYS;
+          await updateConversationContext(conversation?.id, context);
+          break;
+          
+        case BUTTON_QUESTIONS.AVAILABLE_DAYS:
+          context.available_days = mappedValue;
+          context.currentQuestion = undefined;
+          await updateConversationContext(conversation?.id, context);
+          const message2 = "Tem alguma condição de saúde ou lesão que deva considerar? (se não, responda 'nenhuma')";
+          await sendWhatsappMessage(from, message2);
+          await saveAssistantMessage(conversation.client_id, message2);
+          break;
+          
+        case BUTTON_QUESTIONS.EXERCISE_PREFERENCES:
+          context.exercise_preferences = mappedValue;
+          context.currentQuestion = undefined;
+          await updateConversationContext(conversation?.id, context);
+          const message3 = "Tem restrições alimentares ou alergias? (se não, responda 'nenhuma')";
+          await sendWhatsappMessage(from, message3);
+          await saveAssistantMessage(conversation.client_id, message3);
+          break;
+      }
+      return;
+    }
+    
+    // Se não é uma resposta válida de botão, verificar se deveria ser
+    if (currentQuestion) {
+      const warningMessage = "⚠️ Por favor, use os botões fornecidos para responder. Vou repetir a pergunta:";
+      await sendWhatsappMessage(from, warningMessage);
+      await saveAssistantMessage(conversation.client_id, warningMessage);
+      
+      // Repetir a pergunta com botões
+      switch (currentQuestion) {
+        case BUTTON_QUESTIONS.GENDER:
+          await sendGenderQuestion(from, conversation.client_id);
+          break;
+        case BUTTON_QUESTIONS.EXPERIENCE:
+          await sendExperienceQuestion(from, conversation.client_id);
+          break;
+        case BUTTON_QUESTIONS.AVAILABLE_DAYS:
+          await sendAvailableDaysQuestion(from, conversation.client_id);
+          break;
+        case BUTTON_QUESTIONS.EXERCISE_PREFERENCES:
+          await sendExercisePreferencesQuestion(from, conversation.client_id);
+          break;
+      }
+      return;
+    }
+    
+    // Fluxo normal para perguntas de texto livre
     if (!context.name) {
       context.name = text;
       await updateConversationContext(conversation?.id, context);
@@ -240,17 +341,13 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
       context.goal = text;
       await updateConversationContext(conversation?.id, context);
       const message1 = "Perfeito! Agora preciso de mais algumas informações:";
-      const message2 = "Qual seu gênero? (masculino/feminino)";
       await sendWhatsappMessage(from, message1);
-      await sendWhatsappMessage(from, message2);
       await saveAssistantMessage(conversation.client_id, message1);
-      await saveAssistantMessage(conversation.client_id, message2);
-    } else if (!context.gender) {
-      context.gender = text;
+      
+      // Usar botões para gênero
+      await sendGenderQuestion(from, conversation.client_id);
+      context.currentQuestion = BUTTON_QUESTIONS.GENDER;
       await updateConversationContext(conversation?.id, context);
-      const message = "Qual sua altura em cm? (ex: 175)";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
     } else if (!context.height) {
       context.height = text;
       await updateConversationContext(conversation?.id, context);
@@ -260,33 +357,19 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
     } else if (!context.weight) {
       context.weight = text;
       await updateConversationContext(conversation?.id, context);
-      const message = "Qual sua experiência com exercícios? (iniciante, intermediário, avançado)";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
-    } else if (!context.experience) {
-      context.experience = text;
+      
+      // Usar botões para experiência
+      await sendExperienceQuestion(from, conversation.client_id);
+      context.currentQuestion = BUTTON_QUESTIONS.EXPERIENCE;
       await updateConversationContext(conversation?.id, context);
-      const message = "Quantos dias por semana pode treinar? (ex: 3 dias, 5 dias)";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
-    } else if (!context.available_days) {
-      context.available_days = text;
-      await updateConversationContext(conversation?.id, context);
-      const message = "Tem alguma condição de saúde ou lesão que deva considerar? (se não, responda 'nenhuma')";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
     } else if (!context.health_conditions) {
       context.health_conditions = text;
       await updateConversationContext(conversation?.id, context);
-      const message = "Que tipo de exercícios prefere? (ex: musculação, cardio, yoga, funcional)";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
-    } else if (!context.exercise_preferences) {
-      context.exercise_preferences = text;
+      
+      // Usar botões para preferências de exercício
+      await sendExercisePreferencesQuestion(from, conversation.client_id);
+      context.currentQuestion = BUTTON_QUESTIONS.EXERCISE_PREFERENCES;
       await updateConversationContext(conversation?.id, context);
-      const message = "Tem restrições alimentares ou alergias? (se não, responda 'nenhuma')";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
     } else if (!context.dietary_restrictions) {
       context.dietary_restrictions = text;
       await updateConversationContext(conversation?.id, context);
@@ -304,7 +387,7 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
       await updateConversationContext(conversation?.id, context);
       
       // TODAS AS INFORMAÇÕES COLETADAS - SALVAR NA TABELA CLIENTS
-      console.log('Salvando dados do cliente na tabela clients...');
+      console.log('💾 Salvando dados do cliente...');
       
       try {
         // Atualizar dados do cliente na tabela clients
@@ -330,12 +413,12 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
           .eq("id", conversation.client_id);
 
         if (clientUpdateError) {
-          console.error('Erro ao atualizar dados do cliente:', clientUpdateError);
+          console.error('❌ Erro ao atualizar dados do cliente:', clientUpdateError);
         } else {
-          console.log('Dados do cliente salvos com sucesso!');
+          console.log('✅ Dados do cliente salvos');
         }
       } catch (error) {
-        console.error('Erro ao salvar dados do cliente:', error);
+        console.error('❌ Erro ao salvar dados do cliente:', error);
       }
       
       // Avançar para pagamento
@@ -356,7 +439,7 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
       await saveAssistantMessage(conversation.client_id, message);
     }
   } catch (error) {
-    console.log("Erro no estado WAITING_FOR_INFO:", error);
+    console.log("❌ Erro no estado WAITING_FOR_INFO:", error);
   }
 }
 
@@ -388,7 +471,7 @@ async function handlePaidState(from: string, conversation: any) {
     const plano = await generateTrainingAndNutritionPlan(context);
 
     // MUDANÇA: Salvar plano como PENDENTE para revisão em vez de enviar diretamente
-    console.log('Salvando plano como pendente para revisão...');
+    console.log('📋 Salvando plano como pendente...');
     
     // Importar a função savePendingPlan
     const { savePendingPlan } = await import('./services/dashboardService');
@@ -396,7 +479,7 @@ async function handlePaidState(from: string, conversation: any) {
     // Salvar como plano pendente
     const planId = await savePendingPlan(conversation.client_id, plano);
     
-    console.log(`Plano salvo como pendente com ID: ${planId}`);
+    console.log(`✅ Plano pendente salvo (ID: ${planId})`);
 
     // Atualizar estado da conversa para aguardar aprovação do plano
     await supabase
@@ -416,8 +499,8 @@ async function handlePaidState(from: string, conversation: any) {
     await saveAssistantMessage(conversation.client_id, '⏰ Normalmente este processo demora 24-48 horas.');
 
   } catch (error) {
-    console.log("Erro no estado PAID:", error);
-    console.error('Erro ao gerar/salvar plano pendente:', error);
+    console.log("❌ Erro no estado PAID:", error);
+    console.error('❌ Erro ao gerar/salvar plano pendente:', error);
     await sendWhatsappMessage(from, `Erro ao processar o seu plano. Por favor contacte o suporte.`);
   }
 }
@@ -433,7 +516,102 @@ async function handleQuestionsState(from: string, text: string, conversation: an
     const resposta = await askQuestionToAI(conversation.client_id, context, text);
     await sendWhatsappMessage(from, resposta);
   } catch (error) {
-    console.error('Erro ao responder dúvida:', error);
+    console.error('❌ Erro ao responder dúvida:', error);
     await sendWhatsappMessage(from, 'Ocorreu um erro ao responder sua dúvida. Tente novamente mais tarde.');
   }
+}
+
+// Funções auxiliares para botões (versão elegante)
+async function sendGenderQuestion(from: string, clientId: string) {
+  const message = "Qual seu gênero?";
+  const buttons = [
+    { id: "masculino", label: "Masculino" },
+    { id: "feminino", label: "Feminino" }
+  ];
+  
+  await sendButtonList(from, message, buttons);
+  await saveAssistantMessage(clientId, message);
+}
+
+async function sendExperienceQuestion(from: string, clientId: string) {
+  const message = "Qual sua experiência com exercícios?";
+  const buttons = [
+    { id: "iniciante", label: "Iniciante" },
+    { id: "intermediario", label: "Intermediário" },
+    { id: "avancado", label: "Avançado" }
+  ];
+  
+  await sendButtonList(from, message, buttons);
+  await saveAssistantMessage(clientId, message);
+}
+
+async function sendAvailableDaysQuestion(from: string, clientId: string) {
+  const message = "Quantos dias por semana pode treinar?";
+  const buttons = [
+    { id: "2_dias", label: "2 dias" },
+    { id: "3_dias", label: "3 dias" },
+    { id: "4_dias", label: "4 dias" },
+    { id: "5_dias", label: "5 dias" },
+    { id: "6_dias", label: "6 dias" }
+  ];
+  
+  await sendButtonList(from, message, buttons);
+  await saveAssistantMessage(clientId, message);
+}
+
+async function sendExercisePreferencesQuestion(from: string, clientId: string) {
+  const message = "Que tipo de exercícios prefere?";
+  const buttons = [
+    { id: "musculacao", label: "Musculação" },
+    { id: "cardio", label: "Cardio" },
+    { id: "yoga", label: "Yoga" },
+    { id: "funcional", label: "Funcional" },
+    { id: "misturado", label: "Misturado" }
+  ];
+  
+  await sendButtonList(from, message, buttons);
+  await saveAssistantMessage(clientId, message);
+}
+
+// Função para verificar se a resposta é válida para perguntas com botões
+function isValidButtonResponse(questionType: string, response: string): boolean {
+  const validResponses: { [key: string]: string[] } = {
+    [BUTTON_QUESTIONS.GENDER]: ["masculino", "feminino"],
+    [BUTTON_QUESTIONS.EXPERIENCE]: ["iniciante", "intermediario", "avancado"],
+    [BUTTON_QUESTIONS.AVAILABLE_DAYS]: ["2_dias", "3_dias", "4_dias", "5_dias", "6_dias"],
+    [BUTTON_QUESTIONS.EXERCISE_PREFERENCES]: ["musculacao", "cardio", "yoga", "funcional", "misturado"]
+  };
+  
+  return validResponses[questionType]?.includes(response.toLowerCase()) || false;
+}
+
+// Função para mapear IDs dos botões para valores legíveis
+function mapButtonIdToValue(questionType: string, buttonId: string): string {
+  const mappings: { [key: string]: { [key: string]: string } } = {
+    [BUTTON_QUESTIONS.GENDER]: {
+      "masculino": "masculino",
+      "feminino": "feminino"
+    },
+    [BUTTON_QUESTIONS.EXPERIENCE]: {
+      "iniciante": "iniciante",
+      "intermediario": "intermediário",
+      "avancado": "avançado"
+    },
+    [BUTTON_QUESTIONS.AVAILABLE_DAYS]: {
+      "2_dias": "2 dias",
+      "3_dias": "3 dias",
+      "4_dias": "4 dias",
+      "5_dias": "5 dias",
+      "6_dias": "6 dias"
+    },
+    [BUTTON_QUESTIONS.EXERCISE_PREFERENCES]: {
+      "musculacao": "musculação",
+      "cardio": "cardio",
+      "yoga": "yoga",
+      "funcional": "funcional",
+      "misturado": "misturado"
+    }
+  };
+  
+  return mappings[questionType]?.[buttonId] || buttonId;
 }
