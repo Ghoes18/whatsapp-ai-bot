@@ -197,6 +197,23 @@ export async function sendMessageToClient(
   
   console.log('Mensagem salva no histórico com sucesso');
 
+  // Atualizar last_message_at do cliente para Realtime
+  console.log('Atualizando last_message_at do cliente...');
+  const { error: updateError } = await supabase
+    .from("clients")
+    .update({ 
+      last_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString() 
+    })
+    .eq("id", clientId);
+
+  if (updateError) {
+    console.error("Erro ao atualizar last_message_at:", updateError);
+    // Não interromper o fluxo se esta atualização falhar
+  } else {
+    console.log('last_message_at atualizado com sucesso');
+  }
+
   // Enviar mensagem via WhatsApp
   try {
     console.log('Enviando mensagem via WhatsApp para:', client.phone);

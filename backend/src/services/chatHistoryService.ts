@@ -25,5 +25,22 @@ export async function saveChatMessage(clientId: string, message: Message): Promi
     .insert([{ client_id: clientId, role: message.role, content: message.content }]);
   if (error) {
     console.error('Erro ao salvar mensagem:', error);
+    throw error;
+  }
+
+  // Atualizar last_message_at do cliente para Realtime (só para mensagens de usuário)
+  if (message.role === 'user') {
+    const { error: updateError } = await supabase
+      .from('clients')
+      .update({ 
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', clientId);
+
+    if (updateError) {
+      console.error('Erro ao atualizar last_message_at:', updateError);
+      // Não interromper o fluxo se esta atualização falhar
+    }
   }
 }
