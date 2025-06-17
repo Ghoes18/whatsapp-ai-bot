@@ -38,13 +38,67 @@ const PlanViewModal: React.FC<PlanViewModalProps> = ({ planId, isOpen, onClose }
       setGeneratingPDF(true);
       const response = await dashboardAPI.generatePlanPDF(planId);
       
-      // Abrir o PDF em uma nova aba
+      // Handle base64 PDF data
       if (response.pdfUrl) {
-        window.open(response.pdfUrl, '_blank');
+        // Check if it's a data URL (base64)
+        if (response.pdfUrl.startsWith('data:application/pdf;base64,')) {
+          // Create a blob from the base64 data
+          const base64Data = response.pdfUrl.split(',')[1];
+          const pdfBlob = new Blob([Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], {
+            type: 'application/pdf'
+          });
+          
+          // Create a URL for the blob
+          const pdfUrl = URL.createObjectURL(pdfBlob);
+          
+          // Open in new tab
+          window.open(pdfUrl, '_blank');
+          
+          // Clean up the URL after a delay
+          setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+        } else {
+          // Handle regular URL (fallback)
+          window.open(response.pdfUrl, '_blank');
+        }
       }
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       setError('Erro ao gerar PDF');
+    } finally {
+      setGeneratingPDF(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      setGeneratingPDF(true);
+      const response = await dashboardAPI.generatePlanPDF(planId);
+      
+      // Handle base64 PDF data for download
+      if (response.pdfUrl) {
+        if (response.pdfUrl.startsWith('data:application/pdf;base64,')) {
+          // Create a blob from the base64 data
+          const base64Data = response.pdfUrl.split(',')[1];
+          const pdfBlob = new Blob([Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], {
+            type: 'application/pdf'
+          });
+          
+          // Create download link
+          const downloadUrl = URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = `plano-${plan?.type || 'treino'}-${plan?.client.name || 'cliente'}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          // Clean up the URL
+          setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao fazer download do PDF:', err);
+      setError('Erro ao fazer download do PDF');
     } finally {
       setGeneratingPDF(false);
     }
@@ -102,9 +156,31 @@ const PlanViewModal: React.FC<PlanViewModalProps> = ({ planId, isOpen, onClose }
                 ) : (
                   <>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
-                    Gerar PDF
+                    Visualizar PDF
+                  </>
+                )}
+              </button>
+            )}
+            {plan && (
+              <button
+                onClick={handleDownloadPDF}
+                disabled={generatingPDF}
+                className="flex items-center gap-2 px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generatingPDF ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin"></div>
+                    Baixando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download PDF
                   </>
                 )}
               </button>

@@ -26,6 +26,7 @@ import {
   getMessageStatus,
   markMessageAsRead 
 } from './src/services/zapi';
+import { generateAndUploadPlanPDF } from './src/services/pdfService';
 import rateLimit from 'express-rate-limit';
 
 // Cache simples em memória para melhorar performance
@@ -256,6 +257,79 @@ router.get('/plans/:planId/content', async (req, res) => {
     } else {
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
+  }
+});
+
+// Gerar PDF de um plano
+router.post('/plans/:planId/generate-pdf', async (req, res) => {
+  try {
+    const { planId } = req.params;
+    
+    console.log(`📄 Gerando PDF para plano: ${planId}`);
+    
+    // Buscar dados do plano diretamente da tabela plans
+    const { data: plan, error: planError } = await supabase
+      .from('plans')
+      .select(`
+        id,
+        client_id,
+        type,
+        plan_content,
+        created_at,
+        expires_at
+      `)
+      .eq('id', planId)
+      .single();
+
+    if (planError || !plan) {
+      console.error(`❌ Plano não encontrado: ${planId}`, planError);
+      return res.status(404).json({ error: 'Plano não encontrado' });
+    }
+    
+    console.log(`✅ Plano encontrado:`, { id: plan.id, type: plan.type, client_id: plan.client_id });
+    
+    // Buscar dados do cliente
+    const client = await getClientById(plan.client_id);
+    if (!client) {
+      console.error(`❌ Cliente não encontrado: ${plan.client_id}`);
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+    
+    console.log(`✅ Cliente encontrado:`, { id: client.id, name: client.name });
+    
+    // Preparar dados para o PDF
+    const planData = {
+      id: plan.id,
+      client_id: plan.client_id,
+      type: plan.type,
+      content: plan.plan_content,
+      created_at: plan.created_at,
+      expires_at: plan.expires_at
+    };
+    
+    const clientContext = {
+      name: client.name,
+      age: client.age?.toString(),
+      gender: client.gender,
+      height: client.height?.toString(),
+      weight: client.weight?.toString(),
+      goal: client.goal
+    };
+    
+    console.log(`📋 Dados preparados para PDF:`, { planData, clientContext });
+    
+    // Gerar PDF como base64
+    const pdfDataUrl = await generateAndUploadPlanPDF(planData, clientContext);
+    
+    console.log(`✅ PDF gerado com sucesso como base64`);
+    res.json({ pdfUrl: pdfDataUrl });
+  } catch (error) {
+    console.error('❌ Erro ao gerar PDF do plano:', error);
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 
