@@ -199,6 +199,26 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
     const client = await getOrCreateClient(from);
     if (!client) return;
 
+    // 🔍 VERIFICAÇÃO DE DUPLICAÇÃO: Verificar se já processamos esta mensagem
+    const messageHash = `${from}-${text}-${Date.now()}`;
+    const recentMessages = new Set();
+    
+    // Verificar se a mesma mensagem foi processada nos últimos 5 segundos
+    const { data: recentData } = await supabase
+      .from("chat_messages")
+      .select("content, created_at")
+      .eq("client_id", client.id)
+      .eq("role", "user")
+      .gte("created_at", new Date(Date.now() - 5000).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (recentData && recentData.some((msg: any) => msg.content === text)) {
+      console.log("🔄 DUPLICAÇÃO DETECTADA: Mensagem já processada recentemente");
+      res.status(200).send("Mensagem duplicada ignorada");
+      return;
+    }
+
     // SALVAR MENSAGEM RECEBIDA NA TABELA CHAT_MESSAGES
     try {
       const { error: messageError } = await supabase.from("chat_messages").insert([

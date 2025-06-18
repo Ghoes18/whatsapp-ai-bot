@@ -4,6 +4,9 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { handleWebhook } from './webhookHandler';
 import dashboardRoutes from '../dashboardRoutes';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
 const server = createServer(app);
@@ -14,7 +17,7 @@ const io = new Server(server, {
   }
 });
 
-const PORT = process.env.PORT ?? 3000;
+const PORT = process.env.PORT || 3000;
 
 // Handlers para prevenir crashes
 process.on('unhandledRejection', (reason, promise) => {

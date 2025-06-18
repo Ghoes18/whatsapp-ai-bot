@@ -182,10 +182,6 @@ Pergunta: ${question}
       completion.choices[0].message?.content ||
       "Não foi possível gerar uma resposta.";
 
-    // Guarda apenas a pergunta simples e resposta no histórico (sem contexto/plano)
-    await saveChatMessage(clientId, { role: "user", content: question });
-    await saveChatMessage(clientId, { role: "assistant", content: answer });
-
     return answer;
   } catch (error) {
     return "Ocorreu um erro ao obter resposta da inteligência artificial."

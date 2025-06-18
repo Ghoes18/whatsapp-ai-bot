@@ -207,7 +207,6 @@ const Conversations: React.FC = () => {
   };
 
   const clearMessagesState = useCallback(() => {
-    console.log("🧹 Limpando estado das mensagens");
     setMessages([]);
     setSelectedClient(null);
     setIsLoadingMessages(false);
@@ -222,11 +221,9 @@ const Conversations: React.FC = () => {
     if (!isLoadingClients) return;
 
     try {
-      console.log("👥 Carregando clientes...");
       const response = await dashboardAPI.getClients();
       const clientsList = Array.isArray(response) ? response : [];
       setClients(clientsList);
-      console.log(`✅ ${clientsList.length} clientes carregados`);
     } catch (error) {
       console.error("❌ Erro ao carregar clientes:", error);
       setClients([]);
@@ -238,14 +235,25 @@ const Conversations: React.FC = () => {
   // Handler para novas mensagens em tempo real
   const handleRealtimeMessage = useCallback(
     (message: RealtimeMessage) => {
-      console.log("📨 Nova mensagem via Realtime:", message);
-
       // Se a mensagem é para o cliente atualmente selecionado, adicionar à lista
       if (message.client_id === clientId) {
         setMessages((prev) => {
-          // Verificar se a mensagem já existe para evitar duplicatas
-          const exists = prev.find((m) => m.id === message.id);
-          if (exists) return prev;
+          // Verificação robusta de duplicatas
+          const existsById = prev.find((m) => m.id === message.id);
+          if (existsById) {
+            return prev;
+          }
+
+          // Verificar duplicata por conteúdo e timestamp próximo (para casos de temp IDs)
+          const existsByContent = prev.find((m) => 
+            m.content === message.content && 
+            m.role === message.role &&
+            Math.abs(new Date(m.created_at).getTime() - new Date(message.created_at).getTime()) < 5000 // 5 segundos de diferença
+          );
+          
+          if (existsByContent) {
+            return prev;
+          }
 
           const newMessage: Message = {
             id: message.id,
@@ -276,8 +284,6 @@ const Conversations: React.FC = () => {
   // Handler para atualizações de mensagens (ex: marcadas como lidas)
   const handleRealtimeMessageUpdate = useCallback(
     (message: RealtimeMessage) => {
-      console.log("📝 Mensagem atualizada via Realtime:", message);
-
       // Se a mensagem é para o cliente atualmente selecionado, atualizar na lista
       if (message.client_id === clientId) {
         setMessages((prev) =>
@@ -292,8 +298,6 @@ const Conversations: React.FC = () => {
 
   // Handler para atualizações de clientes
   const handleRealtimeClientUpdate = useCallback((client: RealtimeClient) => {
-    console.log("👤 Cliente atualizado via Realtime:", client);
-
     setClients((prev) => {
       const existingIndex = prev.findIndex((c) => c.id === client.id);
       if (existingIndex >= 0) {
@@ -311,12 +315,10 @@ const Conversations: React.FC = () => {
   const loadMessages = useCallback(
     async (targetClientId: string) => {
       if (!targetClientId) {
-        console.log("❌ loadMessages: clientId não definido");
         return;
       }
 
       if (isCacheValid(targetClientId)) {
-        console.log("📨 Usando mensagens do cache");
         setMessages(messagesCacheRef.current[targetClientId].messages);
         return;
       }
@@ -328,18 +330,15 @@ const Conversations: React.FC = () => {
       abortControllerRef.current = new AbortController();
 
       setIsLoadingMessages(true);
-      console.log(`📨 Carregando mensagens para cliente: ${targetClientId}`);
 
       try {
         const response = await dashboardAPI.getMessages(targetClientId);
 
         if (abortControllerRef.current?.signal.aborted) {
-          console.log("🚫 Requisição abortada");
           return;
         }
 
         const newMessages = Array.isArray(response) ? response : [];
-        console.log(`📨 ${newMessages.length} mensagens recebidas`);
 
         if (targetClientId === clientId) {
           const sortedMessages = [...newMessages].sort(
@@ -353,20 +352,12 @@ const Conversations: React.FC = () => {
             timestamp: Date.now(),
           };
 
-          console.log(
-            `📨 Definindo ${sortedMessages.length} mensagens no estado`
-          );
           setMessages(sortedMessages);
 
           setTimeout(() => scrollToBottom(), 100);
-        } else {
-          console.log(
-            "⚠️ Cliente mudou durante carregamento, ignorando resultado"
-          );
         }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
-          console.log("🚫 Requisição de mensagens cancelada");
           return;
         }
         console.error("❌ Erro ao carregar mensagens:", error);
@@ -385,7 +376,6 @@ const Conversations: React.FC = () => {
   const markMessagesAsRead = useCallback(
     async (targetClientId: string) => {
       if (lastMarkedReadRef.current === targetClientId) {
-        console.log("⏳ Aguardando debounce anterior para marcar como lido");
         return;
       }
 
@@ -397,9 +387,6 @@ const Conversations: React.FC = () => {
 
       markReadTimeoutRef.current = setTimeout(async () => {
         try {
-          console.log(
-            `📖 Marcando mensagens como lidas para cliente: ${targetClientId}`
-          );
           const result = await dashboardAPI.markClientMessagesAsRead(
             targetClientId
           );
@@ -410,8 +397,6 @@ const Conversations: React.FC = () => {
           }
 
           delete messagesCacheRef.current[targetClientId];
-
-          console.log("✅ Mensagens marcadas como lidas");
         } catch (error) {
           console.error("❌ Erro ao marcar mensagens como lidas:", error);
           // Fallback: forçar atualização completa em caso de erro
@@ -430,37 +415,46 @@ const Conversations: React.FC = () => {
 
   // Configurar subscriptions de clientes (geral)
   useEffect(() => {
-    console.log("🔔 Configurando subscription de clientes");
-    setRealtimeConnected(true);
+    // Monitorar mudanças no status de conexão
+    const checkConnection = () => {
+      const status = realtimeService.getConnectionStatus();
+      setRealtimeConnected(status === 'connected');
+    };
+    
+    // Verificar imediatamente
+    checkConnection();
+    
+    // Verificar periodicamente
+    const statusInterval = setInterval(checkConnection, 30000); // 30 segundos
 
     realtimeService.subscribeToClientsUpdates(handleRealtimeClientUpdate);
 
     return () => {
-      console.log("🔕 Limpando subscription de clientes");
+      clearInterval(statusInterval);
       realtimeService.unsubscribe("clients_updates");
-      setRealtimeConnected(false);
     };
   }, [handleRealtimeClientUpdate]);
 
   // Configurar subscriptions de mensagens para cliente específico
   useEffect(() => {
     if (clientId) {
-      console.log(
-        `🔔 Configurando subscription de mensagens para cliente: ${clientId}`
-      );
-
       const client = clients.find((c) => c.id === clientId);
+
       if (client) {
         setSelectedClient(client);
         loadMessages(clientId);
         markMessagesAsRead(clientId);
 
-        // Configurar subscription para mensagens deste cliente
-        realtimeService.subscribeToClientMessages(
-          clientId,
-          handleRealtimeMessage,
-          handleRealtimeMessageUpdate
-        );
+        try {
+          // Configurar subscription para mensagens deste cliente
+          realtimeService.subscribeToClientMessages(
+            clientId,
+            handleRealtimeMessage,
+            handleRealtimeMessageUpdate
+          );
+        } catch (error) {
+          console.error(`❌ Erro ao configurar subscription para cliente ${clientId}:`, error);
+        }
       }
     } else {
       clearMessagesState();
@@ -472,21 +466,10 @@ const Conversations: React.FC = () => {
 
     return () => {
       if (clientId) {
-        console.log(
-          `🔕 Limpando subscription de mensagens para cliente: ${clientId}`
-        );
         realtimeService.unsubscribe(`messages_${clientId}`);
       }
     };
-  }, [
-    clientId,
-    clients,
-    loadMessages,
-    markMessagesAsRead,
-    clearMessagesState,
-    handleRealtimeMessage,
-    handleRealtimeMessageUpdate,
-  ]);
+  }, [clientId, clients.length]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -522,25 +505,13 @@ const Conversations: React.FC = () => {
     setIsSendingMessage(true);
 
     try {
-      console.log(
-        `📤 Enviando mensagem para ${selectedClient.name}: ${messageToSend}`
-      );
-
-      const response = await dashboardAPI.sendMessage(
+      await dashboardAPI.sendMessage(
         selectedClient.id,
         messageToSend
       );
-      console.log("✅ Mensagem enviada:", response);
 
-      const newMsg: Message = {
-        id: `temp-${Date.now()}`,
-        content: messageToSend,
-        role: "assistant",
-        created_at: new Date().toISOString(),
-        client_id: selectedClient.id,
-      };
-
-      setMessages((prev) => [...prev, newMsg]);
+      // Invalidar cache para forçar atualização
+      delete messagesCacheRef.current[selectedClient.id];
 
       setTimeout(() => scrollToBottom(), 100);
     } catch (error) {
