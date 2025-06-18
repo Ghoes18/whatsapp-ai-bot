@@ -416,6 +416,41 @@ async function processApprovedPlan(plan: any): Promise<void> {
     // Enviar mensagem via WhatsApp
     await sendWhatsappMessage(plan.client.phone, message);
     
+    // Enviar mensagem adicional informando que pode fazer perguntas
+    const followUpMessage = "💬 Tem alguma dúvida sobre o seu plano? Pode perguntar qualquer coisa! Estou aqui para ajudar.";
+    await sendWhatsappMessage(plan.client.phone, followUpMessage);
+    
+    // Salvar mensagem de follow-up na tabela chat_messages
+    const { error: followUpError } = await supabase
+      .from("chat_messages")
+      .insert([
+        {
+          client_id: plan.client_id,
+          role: "assistant",
+          content: followUpMessage,
+        },
+      ]);
+
+    if (followUpError) {
+      console.error("Erro ao salvar mensagem de follow-up:", followUpError);
+    }
+    
+    // Atualizar estado da conversa para QUESTIONS para permitir perguntas
+    const { error: convError } = await supabase
+      .from("conversations")
+      .update({ 
+        state: "QUESTIONS",
+        updated_at: new Date().toISOString()
+      })
+      .eq("client_id", plan.client_id)
+      .eq("state", "WAITING_FOR_PAYMENT"); // Só atualizar se estiver em WAITING_FOR_PAYMENT
+
+    if (convError) {
+      console.error("Erro ao atualizar estado da conversa:", convError);
+    } else {
+      console.log("✅ Estado da conversa atualizado para QUESTIONS");
+    }
+    
   } catch (error) {
     console.error("Erro ao processar plano aprovado:", error);
     throw error;

@@ -12,7 +12,6 @@ const STATES = {
   WAITING_FOR_INFO: "WAITING_FOR_INFO",
   WAITING_FOR_PAYMENT: "WAITING_FOR_PAYMENT",
   PAID: "PAID",
-  SENT_PLAN: "SENT_PLAN",
   QUESTIONS: "QUESTIONS",
 } as const;
 type State = typeof STATES[keyof typeof STATES];
@@ -43,8 +42,13 @@ interface ClientContext {
   [key: string]: any;
 }
 
-async function saveAssistantMessage(clientId: string, content: string) {
+// Nova função que combina envio e salvamento
+async function sendMessageAndSave(to: string, clientId: string, content: string) {
   try {
+    // Enviar mensagem via WhatsApp
+    await sendWhatsappMessage(to, content);
+    
+    // Salvar na base de dados
     const { error: messageError } = await supabase.from("chat_messages").insert([
       {
         client_id: clientId,
@@ -57,7 +61,30 @@ async function saveAssistantMessage(clientId: string, content: string) {
       console.error("❌ Erro ao salvar mensagem do assistente:", messageError);
     }
   } catch (error) {
-    console.error('❌ Erro ao salvar mensagem do assistente:', error);
+    console.error('❌ Erro ao enviar/salvar mensagem:', error);
+  }
+}
+
+// Nova função que combina envio de botões e salvamento
+async function sendButtonListAndSave(to: string, clientId: string, message: string, buttons: Array<{id: string, label: string}>) {
+  try {
+    // Enviar botões via WhatsApp
+    await sendButtonList(to, message, buttons);
+    
+    // Salvar na base de dados
+    const { error: messageError } = await supabase.from("chat_messages").insert([
+      {
+        client_id: clientId,
+        role: "assistant",
+        content: message,
+      },
+    ]);
+
+    if (messageError) {
+      console.error("❌ Erro ao salvar mensagem com botões:", messageError);
+    }
+  } catch (error) {
+    console.error('❌ Erro ao enviar/salvar botões:', error);
   }
 }
 
@@ -240,10 +267,9 @@ async function handleStartState(from: string, clientId: string) {
       return;
     }
     console.log("🚀 Iniciando conversa com cliente:", from);
-    await sendWhatsappMessage(from, "Olá! Sou a IA da FitAI. Irei lhe atender da forma mais rápida e eficiente possível, para conseguirmos lhe dar o nosso melhor serviço.");
+    await sendMessageAndSave(from, clientId, "Olá! Sou a IA da FitAI. Irei lhe atender da forma mais rápida e eficiente possível, para conseguirmos lhe dar o nosso melhor serviço.");
     const message = "Para começarmos, qual é o seu primeiro e último nome?";
-    await sendWhatsappMessage(from, message);
-    await saveAssistantMessage(clientId, message);
+    await sendMessageAndSave(from, clientId, message);
   } catch (error) {
     console.log("❌ Erro no estado START:", error);
   }
@@ -266,8 +292,7 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
           context.currentQuestion = undefined;
           await updateConversationContext(conversation?.id, context);
           const message = "Qual sua altura em cm? (ex: 175)";
-          await sendWhatsappMessage(from, message);
-          await saveAssistantMessage(conversation.client_id, message);
+          await sendMessageAndSave(from, conversation.client_id, message);
           break;
           
         case BUTTON_QUESTIONS.EXPERIENCE:
@@ -284,8 +309,7 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
           context.currentQuestion = undefined;
           await updateConversationContext(conversation?.id, context);
           const message2 = "Tem alguma condição de saúde ou lesão que deva considerar? (se não, responda 'nenhuma')";
-          await sendWhatsappMessage(from, message2);
-          await saveAssistantMessage(conversation.client_id, message2);
+          await sendMessageAndSave(from, conversation.client_id, message2);
           break;
           
         case BUTTON_QUESTIONS.EXERCISE_PREFERENCES:
@@ -293,8 +317,7 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
           context.currentQuestion = undefined;
           await updateConversationContext(conversation?.id, context);
           const message3 = "Tem restrições alimentares ou alergias? (se não, responda 'nenhuma')";
-          await sendWhatsappMessage(from, message3);
-          await saveAssistantMessage(conversation.client_id, message3);
+          await sendMessageAndSave(from, conversation.client_id, message3);
           break;
       }
       return;
@@ -303,8 +326,7 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
     // Se não é uma resposta válida de botão, verificar se deveria ser
     if (currentQuestion) {
       const warningMessage = "⚠️ Por favor, use os botões fornecidos para responder. Vou repetir a pergunta:";
-      await sendWhatsappMessage(from, warningMessage);
-      await saveAssistantMessage(conversation.client_id, warningMessage);
+      await sendMessageAndSave(from, conversation.client_id, warningMessage);
       
       // Repetir a pergunta com botões
       switch (currentQuestion) {
@@ -329,20 +351,17 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
       context.name = text;
       await updateConversationContext(conversation?.id, context);
       const message = `Prazer, ${text}! Qual sua idade?`;
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
+      await sendMessageAndSave(from, conversation.client_id, message);
     } else if (!context.age) {
       context.age = text;
       await updateConversationContext(conversation?.id, context);
       const message = "Qual seu objetivo principal? (ex: emagrecer, ganhar massa, etc)";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
+      await sendMessageAndSave(from, conversation.client_id, message);
     } else if (!context.goal) {
       context.goal = text;
       await updateConversationContext(conversation?.id, context);
       const message1 = "Perfeito! Agora preciso de mais algumas informações:";
-      await sendWhatsappMessage(from, message1);
-      await saveAssistantMessage(conversation.client_id, message1);
+      await sendMessageAndSave(from, conversation.client_id, message1);
       
       // Usar botões para gênero
       await sendGenderQuestion(from, conversation.client_id);
@@ -352,8 +371,7 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
       context.height = text;
       await updateConversationContext(conversation?.id, context);
       const message = "Qual seu peso atual em kg? (ex: 70)";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
+      await sendMessageAndSave(from, conversation.client_id, message);
     } else if (!context.weight) {
       context.weight = text;
       await updateConversationContext(conversation?.id, context);
@@ -374,14 +392,12 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
       context.dietary_restrictions = text;
       await updateConversationContext(conversation?.id, context);
       const message = "Que equipamento tem disponível? (ex: halteres, elásticos, apenas peso corporal)";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
+      await sendMessageAndSave(from, conversation.client_id, message);
     } else if (!context.equipment) {
       context.equipment = text;
       await updateConversationContext(conversation?.id, context);
       const message = "Qual é a sua principal motivação para treinar? (ex: saúde, estética, competição)";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
+      await sendMessageAndSave(from, conversation.client_id, message);
     } else if (!context.motivation) {
       context.motivation = text;
       await updateConversationContext(conversation?.id, context);
@@ -429,14 +445,11 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
         
       const message1 = `Obrigado ${context.name}! Agora você receberá o link para pagamento via Mbway.`;
       const message2 = "💳 Link de pagamento: [IMPLEMENTAR MBWAY]";
-      await sendWhatsappMessage(from, message1);
-      await sendWhatsappMessage(from, message2);
-      await saveAssistantMessage(conversation.client_id, message1);
-      await saveAssistantMessage(conversation.client_id, message2);
+      await sendMessageAndSave(from, conversation.client_id, message1);
+      await sendMessageAndSave(from, conversation.client_id, message2);
     } else {
       const message = "Suas informações já foram coletadas. Aguarde o processamento.";
-      await sendWhatsappMessage(from, message);
-      await saveAssistantMessage(conversation.client_id, message);
+      await sendMessageAndSave(from, conversation.client_id, message);
     }
   } catch (error) {
     console.log("❌ Erro no estado WAITING_FOR_INFO:", error);
@@ -451,11 +464,11 @@ async function handleWaitingForPayment(from: string, text: string, conversation:
       .from("conversations")
       .update({ state: STATES.PAID })
       .eq("id", conversation?.id);
-    await sendWhatsappMessage(from, "Pagamento confirmado! Em instantes você receberá seu plano personalizado.");
+    await sendMessageAndSave(from, conversation.client_id, "Pagamento confirmado! Em instantes você receberá seu plano personalizado.");
     await handlePaidState(from, conversation); // Avança para o próximo estado
     return;
   }
-  await sendWhatsappMessage(from, "Para finalizar, envie o comprovativo do pagamento Mbway para este número ou clique no link: [LINK_DO_MBWAY]");
+  await sendMessageAndSave(from, conversation.client_id, "Para finalizar, envie o comprovativo do pagamento Mbway para este número ou clique no link: [LINK_DO_MBWAY]");
 }
 
 // Estado pago
@@ -463,7 +476,7 @@ async function handlePaidState(from: string, conversation: any) {
   try {
     const context = conversation?.context;
     if (!context) {
-      await sendWhatsappMessage(from, 'Não foi possível encontrar seus dados para gerar o plano.');
+      await sendMessageAndSave(from, conversation.client_id, 'Não foi possível encontrar seus dados para gerar o plano.');
       return;
     }
 
@@ -491,17 +504,14 @@ async function handlePaidState(from: string, conversation: any) {
       .eq('id', conversation.id);
 
     // Notificar o cliente que o plano está sendo preparado
-    await sendWhatsappMessage(from, '✅ Pagamento confirmado! Estamos a preparar o seu plano personalizado.');
-    await saveAssistantMessage(conversation.client_id, '✅ Pagamento confirmado! Estamos a preparar o seu plano personalizado.');
-    await sendWhatsappMessage(from, '📋 O seu plano será revisto pela nossa equipa e enviado em breve.');
-    await saveAssistantMessage(conversation.client_id, '📋 O seu plano será revisto pela nossa equipa e enviado em breve.');
-    await sendWhatsappMessage(from, '⏰ Normalmente este processo demora 24-48 horas.');
-    await saveAssistantMessage(conversation.client_id, '⏰ Normalmente este processo demora 24-48 horas.');
+    await sendMessageAndSave(from, conversation.client_id, '✅ Pagamento confirmado! Estamos a preparar o seu plano personalizado.');
+    await sendMessageAndSave(from, conversation.client_id, '📋 O seu plano será revisto pela nossa equipa e enviado em breve.');
+    await sendMessageAndSave(from, conversation.client_id, '⏰ Normalmente este processo demora 24-48 horas.');
 
   } catch (error) {
     console.log("❌ Erro no estado PAID:", error);
     console.error('❌ Erro ao gerar/salvar plano pendente:', error);
-    await sendWhatsappMessage(from, `Erro ao processar o seu plano. Por favor contacte o suporte.`);
+    await sendMessageAndSave(from, conversation.client_id, `Erro ao processar o seu plano. Por favor contacte o suporte.`);
   }
 }
 
@@ -510,14 +520,14 @@ async function handleQuestionsState(from: string, text: string, conversation: an
   try {
     const context: ClientContext = conversation?.context || {};
     if (!text.trim()) {
-      await sendWhatsappMessage(from, 'Por favor, envie sua dúvida sobre o plano.');
+      await sendMessageAndSave(from, conversation.client_id, 'Por favor, envie sua dúvida sobre o plano.');
       return;
     }
     const resposta = await askQuestionToAI(conversation.client_id, context, text);
-    await sendWhatsappMessage(from, resposta);
+    await sendMessageAndSave(from, conversation.client_id, resposta);
   } catch (error) {
     console.error('❌ Erro ao responder dúvida:', error);
-    await sendWhatsappMessage(from, 'Ocorreu um erro ao responder sua dúvida. Tente novamente mais tarde.');
+    await sendMessageAndSave(from, conversation.client_id, 'Ocorreu um erro ao responder sua dúvida. Tente novamente mais tarde.');
   }
 }
 
@@ -529,8 +539,7 @@ async function sendGenderQuestion(from: string, clientId: string) {
     { id: "feminino", label: "Feminino" }
   ];
   
-  await sendButtonList(from, message, buttons);
-  await saveAssistantMessage(clientId, message);
+  await sendButtonListAndSave(from, clientId, message, buttons);
 }
 
 async function sendExperienceQuestion(from: string, clientId: string) {
@@ -541,8 +550,7 @@ async function sendExperienceQuestion(from: string, clientId: string) {
     { id: "avancado", label: "Avançado" }
   ];
   
-  await sendButtonList(from, message, buttons);
-  await saveAssistantMessage(clientId, message);
+  await sendButtonListAndSave(from, clientId, message, buttons);
 }
 
 async function sendAvailableDaysQuestion(from: string, clientId: string) {
@@ -555,8 +563,7 @@ async function sendAvailableDaysQuestion(from: string, clientId: string) {
     { id: "6_dias", label: "6 dias" }
   ];
   
-  await sendButtonList(from, message, buttons);
-  await saveAssistantMessage(clientId, message);
+  await sendButtonListAndSave(from, clientId, message, buttons);
 }
 
 async function sendExercisePreferencesQuestion(from: string, clientId: string) {
@@ -569,8 +576,7 @@ async function sendExercisePreferencesQuestion(from: string, clientId: string) {
     { id: "misturado", label: "Misturado" }
   ];
   
-  await sendButtonList(from, message, buttons);
-  await saveAssistantMessage(clientId, message);
+  await sendButtonListAndSave(from, clientId, message, buttons);
 }
 
 // Função para verificar se a resposta é válida para perguntas com botões

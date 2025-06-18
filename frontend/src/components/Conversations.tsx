@@ -584,11 +584,11 @@ const Conversations: React.FC = () => {
         {/* Sidebar space */}
         <div className="hidden w-72 lg:block"></div>
 
-        <div className="flex items-center justify-center flex-1">
+        <div className="flex flex-1 justify-center items-center">
           <div className="text-center">
-            <div className="relative w-16 h-16 mx-auto mb-6">
-              <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-transparent rounded-full border-t-blue-600 animate-spin"></div>
+            <div className="relative mx-auto mb-6 w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin border-t-blue-600"></div>
             </div>
             <h3 className="mb-2 text-lg font-semibold text-gray-900">
               Carregando conversas
@@ -607,25 +607,25 @@ const Conversations: React.FC = () => {
 
       <div className="flex flex-1 bg-gradient-to-br from-gray-50 to-gray-100">
         {/* Fixed Client List */}
-        <div className="flex flex-col w-full border-r border-gray-200 shadow-sm bg-white/80 backdrop-blur-sm lg:w-80">
+        <div className="flex flex-col w-full border-r border-gray-200 shadow-sm backdrop-blur-sm bg-white/80 lg:w-80">
           {/* Enhanced Header */}
-          <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50">
+          <div className="p-6 bg-gradient-to-r from-white to-gray-50 border-b border-gray-100">
             <h2 className="mb-4 text-xl font-bold text-gray-900">Conversas</h2>
 
             <div className="relative">
-              <SearchIcon className="absolute w-5 h-5 text-gray-400 transform -translate-y-1/2 left-4 top-1/2" />
+              <SearchIcon className="absolute left-4 top-1/2 w-5 h-5 text-gray-400 transform -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Buscar clientes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full py-3 pl-12 pr-4 transition-all duration-200 border border-gray-200 rounded-xl bg-white/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:bg-white focus:bg-white"
+                className="py-3 pr-4 pl-12 w-full rounded-xl border border-gray-200 backdrop-blur-sm transition-all duration-200 bg-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:bg-white focus:bg-white"
               />
             </div>
           </div>
 
           {/* Enhanced Client List */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="overflow-y-auto flex-1">
             {filteredClients.length > 0 ? (
               <div className="p-2">
                 {filteredClients.map((client) => (
@@ -655,11 +655,11 @@ const Conversations: React.FC = () => {
                           />
                         </div>
                         {client.last_message_at && (
-                          <div className="absolute w-4 h-4 border-2 border-white rounded-full -bottom-1 -right-1 bg-emerald-500"></div>
+                          <div className="absolute -right-1 -bottom-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="flex justify-between items-center mb-1">
                           <p
                             className={`font-semibold truncate ${
                               clientId === client.id
@@ -697,7 +697,7 @@ const Conversations: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleClientProfileClick(client)}
-                        className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 transition-all duration-200 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-400 hover:shadow-md"
+                        className="inline-flex justify-center items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white rounded-lg border border-gray-300 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md"
                         title="Ver perfil do cliente"
                         aria-label="Ver perfil do cliente"
                       >
@@ -709,7 +709,7 @@ const Conversations: React.FC = () => {
               </div>
             ) : (
               <div className="py-16 text-center">
-                <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-200">
+                <div className="flex justify-center items-center mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full">
                   <PersonIcon className="w-10 h-10 text-gray-400" />
                 </div>
                 <h3 className="mb-2 text-lg font-medium text-gray-900">
@@ -726,19 +726,19 @@ const Conversations: React.FC = () => {
           {selectedClient ? (
             <>
               {/* Enhanced Conversation Header */}
-              <div className="p-6 border-b border-gray-100 shadow-sm bg-white/90 backdrop-blur-sm">
-                <div className="flex items-center justify-between">
+              <div className="p-6 border-b border-gray-100 shadow-sm backdrop-blur-sm bg-white/90">
+                <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-4">
                     <div className="relative">
-                      <div className="flex items-center justify-center w-12 h-12 rounded-full shadow-lg bg-gradient-to-br from-blue-500 to-indigo-600">
+                      <div className="flex justify-center items-center w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full shadow-lg">
                         <PersonIcon className="w-6 h-6 text-white" />
                       </div>
-                      <div className="absolute w-4 h-4 border-2 border-white rounded-full -bottom-1 -right-1 bg-emerald-500"></div>
+                      <div className="absolute -right-1 -bottom-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></div>
                     </div>
                     <div>
                       <div className="flex items-center space-x-2">
                         <h3 className="text-lg font-bold text-gray-900">
-                          {selectedClient.name ?? "Cliente"}
+                          {selectedClient.name ?? selectedClient.phone}
                         </h3>
                         {/* Indicador de conexão Realtime */}
                         <div
@@ -761,9 +761,9 @@ const Conversations: React.FC = () => {
                   {/* Profile Button */}
                   <button
                     onClick={() => handleClientProfileClick(selectedClient)}
-                    className="inline-flex items-center px-4 py-2 transition-all duration-200 bg-white border border-gray-300 shadow-sm rounded-xl hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group"
+                    className="inline-flex items-center px-4 py-2 bg-white rounded-xl border border-gray-300 shadow-sm transition-all duration-200 hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group"
                   >
-                    <UserProfileIcon className="w-4 h-4 mr-2 text-gray-500 group-hover:text-gray-700" />
+                    <UserProfileIcon className="mr-2 w-4 h-4 text-gray-500 group-hover:text-gray-700" />
                     <span className="font-medium text-gray-700 group-hover:text-gray-900">
                       Ver Perfil
                     </span>
@@ -772,11 +772,11 @@ const Conversations: React.FC = () => {
               </div>
 
               {/* Enhanced Messages */}
-              <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white/50">
+              <div className="overflow-y-auto flex-1 p-6 space-y-4 bg-gradient-to-b from-gray-50/50 to-white/50">
                 {isLoadingMessages ? (
-                  <div className="flex items-center justify-center h-32">
+                  <div className="flex justify-center items-center h-32">
                     <div className="text-center">
-                      <div className="w-8 h-8 mx-auto mb-3 border-gray-300 rounded-full border-3 border-t-blue-600 animate-spin"></div>
+                      <div className="mx-auto mb-3 w-8 h-8 rounded-full border-gray-300 animate-spin border-3 border-t-blue-600"></div>
                       <p className="text-sm text-gray-600">
                         Carregando mensagens...
                       </p>
@@ -799,7 +799,7 @@ const Conversations: React.FC = () => {
                             : "bg-white border border-gray-200 text-gray-900"
                         }`}
                       >
-                        <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                           {message.content}
                         </p>
                         <div
@@ -813,7 +813,7 @@ const Conversations: React.FC = () => {
                             {formatTime(message.created_at)}
                           </span>
                           {message.role === "assistant" && (
-                            <CheckIcon className="w-3 h-3 ml-2" />
+                            <CheckIcon className="ml-2 w-3 h-3" />
                           )}
                         </div>
                       </div>
@@ -821,7 +821,7 @@ const Conversations: React.FC = () => {
                   ))
                 ) : (
                   <div className="py-16 text-center">
-                    <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100">
+                    <div className="flex justify-center items-center mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full">
                       <AIIcon className="w-10 h-10 text-blue-600" />
                     </div>
                     <h3 className="mb-2 text-lg font-medium text-gray-900">
@@ -836,17 +836,17 @@ const Conversations: React.FC = () => {
               </div>
 
               {/* Enhanced Message Input */}
-              <div className="p-6 border-t border-gray-100 shadow-sm bg-white/90 backdrop-blur-sm">
+              <div className="p-6 border-t border-gray-100 shadow-sm backdrop-blur-sm bg-white/90">
                 <div className="flex items-center space-x-3">
                   <button
-                    className="p-3 text-gray-400 transition-all duration-200 hover:text-gray-600 hover:bg-gray-100 rounded-xl"
+                    className="p-3 text-gray-400 rounded-xl transition-all duration-200 hover:text-gray-600 hover:bg-gray-100"
                     title="Anexar arquivo"
                     aria-label="Anexar arquivo"
                   >
                     <AttachFileIcon className="w-5 h-5" />
                   </button>
                   <button
-                    className="p-3 text-gray-400 transition-all duration-200 hover:text-gray-600 hover:bg-gray-100 rounded-xl"
+                    className="p-3 text-gray-400 rounded-xl transition-all duration-200 hover:text-gray-600 hover:bg-gray-100"
                     title="Enviar imagem"
                     aria-label="Enviar imagem"
                   >
@@ -861,11 +861,11 @@ const Conversations: React.FC = () => {
                       placeholder="Digite sua mensagem..."
                       disabled={isSendingMessage}
                       rows={1}
-                      className="w-full px-4 py-3 transition-all duration-200 border border-gray-200 resize-none rounded-xl bg-white/70 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 hover:bg-white focus:bg-white"
+                      className="px-4 py-3 w-full rounded-xl border border-gray-200 backdrop-blur-sm transition-all duration-200 resize-none bg-white/70 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 hover:bg-white focus:bg-white"
                     />
                   </div>
                   <button
-                    className="p-3 text-gray-400 transition-all duration-200 hover:text-gray-600 hover:bg-gray-100 rounded-xl"
+                    className="p-3 text-gray-400 rounded-xl transition-all duration-200 hover:text-gray-600 hover:bg-gray-100"
                     title="Gravar áudio"
                     aria-label="Gravar áudio"
                   >
@@ -874,12 +874,12 @@ const Conversations: React.FC = () => {
                   <button
                     onClick={handleSendMessage}
                     disabled={!newMessage.trim() || isSendingMessage}
-                    className="p-3 text-white transition-all duration-200 shadow-sm bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-xl disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    className="p-3 text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-sm transition-all duration-200 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     title="Enviar mensagem"
                     aria-label="Enviar mensagem"
                   >
                     {isSendingMessage ? (
-                      <div className="w-5 h-5 border-2 rounded-full border-white/30 border-t-white animate-spin"></div>
+                      <div className="w-5 h-5 rounded-full border-2 animate-spin border-white/30 border-t-white"></div>
                     ) : (
                       <SendIcon className="w-5 h-5" />
                     )}
@@ -888,9 +888,9 @@ const Conversations: React.FC = () => {
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center flex-1 bg-gradient-to-br from-gray-50 to-white">
+            <div className="flex flex-1 justify-center items-center bg-gradient-to-br from-gray-50 to-white">
               <div className="text-center">
-                <div className="flex items-center justify-center w-24 h-24 mx-auto mb-6 rounded-full shadow-lg bg-gradient-to-br from-blue-100 to-indigo-100">
+                <div className="flex justify-center items-center mx-auto mb-6 w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full shadow-lg">
                   <ChatIcon className="w-12 h-12 text-blue-600" />
                 </div>
                 <h3 className="mb-3 text-xl font-bold text-gray-900">
