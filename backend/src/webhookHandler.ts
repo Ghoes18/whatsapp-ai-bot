@@ -1,7 +1,7 @@
 import { Request, Response, RequestHandler } from "express";
 import dotenv from "dotenv";
 import { sendWhatsappMessage, sendButtonList, sendList, sendButtonWithImage } from "./services/zapi";
-import { generateTrainingAndNutritionPlan, askQuestionToAI } from './services/openaiService';
+import { generateTrainingAndNutritionPlan, askQuestionToAI, detectHumanSupportRequest } from './services/openaiService';
 import { generatePlanPDF } from './services/pdfService';
 import { getOrCreateClient, getActiveConversation, updateConversationContext, updateClientAfterPayment, supabase, savePlanText } from './services/supabaseService';
 
@@ -543,6 +543,45 @@ async function handleQuestionsState(from: string, text: string, conversation: an
       await sendMessageAndSave(from, conversation.client_id, 'Por favor, envie sua dúvida sobre o plano.');
       return;
     }
+
+    // 🤖➡️👨 DETECTAR SOLICITAÇÃO DE ATENDIMENTO HUMANO
+    if (await detectHumanSupportRequest(text)) {
+      console.log('🚨 Cliente solicitou atendimento humano:', from);
+      
+      // Desativar IA para este cliente
+      const { error: disableAIError } = await supabase
+        .from('clients')
+        .update({ ai_enabled: false })
+        .eq('id', conversation.client_id);
+      
+      if (disableAIError) {
+        console.error('❌ Erro ao desativar IA:', disableAIError);
+      }
+
+      // Criar solicitação de suporte humano
+      const { error: supportRequestError } = await supabase
+        .from('human_support_requests')
+        .insert([{
+          client_id: conversation.client_id,
+          original_message: text,
+          status: 'pending'
+        }]);
+
+      if (supportRequestError) {
+        console.error('❌ Erro ao criar solicitação de suporte:', supportRequestError);
+      }
+
+      // Informar ao cliente
+      await sendMessageAndSave(from, conversation.client_id, 
+        '👨‍💼 Entendido! Você será atendido por um membro da nossa equipa em breve.\n\n' +
+        '⏰ Tempo estimado de resposta: 1-2 horas durante horário comercial.\n\n' +
+        '✅ A nossa IA foi desativada e um humano irá responder às suas próximas mensagens.'
+      );
+      
+      console.log('✅ Solicitação de suporte humano criada');
+      return;
+    }
+
     const resposta = await askQuestionToAI(conversation.client_id, context, text);
     await sendMessageAndSave(from, conversation.client_id, resposta);
   } catch (error) {
@@ -550,6 +589,8 @@ async function handleQuestionsState(from: string, text: string, conversation: an
     await sendMessageAndSave(from, conversation.client_id, 'Ocorreu um erro ao responder sua dúvida. Tente novamente mais tarde.');
   }
 }
+
+
 
 // Funções auxiliares para botões (versão elegante)
 async function sendGenderQuestion(from: string, clientId: string) {

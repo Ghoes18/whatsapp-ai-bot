@@ -1,7 +1,14 @@
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import { getChatHistory, saveChatMessage } from './chatHistoryService';
-import { getPlanText } from './supabaseService';
+import { getPlanText, supabase } from './supabaseService';
+import { 
+  getDashboardStats, 
+  getRecentActivity, 
+  getPendingPlans,
+  type RecentActivity,
+  type PendingPlan 
+} from './dashboardService';
 dotenv.config();
 
 export interface ClientContext {
@@ -118,6 +125,51 @@ Mensagem de Motivação
   }
 }
 
+export async function detectHumanSupportRequest(message: string): Promise<boolean> {
+  const systemPrompt = `
+És um assistente especializado em análise de intenções. A tua tarefa é determinar se uma mensagem indica que a pessoa quer falar com um humano/atendente real em vez de continuar com IA.
+
+Responde APENAS com "SIM" ou "NÃO".
+
+SIM - se a mensagem indica claramente que a pessoa:
+- Quer falar com uma pessoa real/humana
+- Não quer mais IA/robô/bot
+- Pede atendimento humano/pessoal
+- Está frustrada com a IA e quer ajuda humana
+- Menciona que quer falar com um operador/atendente
+
+NÃO - para todos os outros casos, incluindo:
+- Perguntas normais sobre treino/nutrição
+- Dúvidas sobre o plano
+- Conversas normais
+- Cumprimentos
+- Qualquer outro tipo de mensagem que não seja explicitamente pedir atendimento humano
+`;
+
+  const userPrompt = `Mensagem a analisar: "${message}"
+
+Esta mensagem indica que a pessoa quer falar com um humano em vez da IA?`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 10,
+      temperature: 0.1, // Baixa temperatura para respostas mais consistentes
+    });
+
+    const response = completion.choices[0].message?.content?.trim().toUpperCase();
+    return response === "SIM";
+  } catch (error) {
+    console.error('❌ Erro ao detectar solicitação de suporte humano:', error);
+    // Em caso de erro, retorna false para não interromper o fluxo
+    return false;
+  }
+}
+
 export async function askQuestionToAI(
   clientId: string,
   context: ClientContext,
@@ -185,5 +237,228 @@ Pergunta: ${question}
     return answer;
   } catch (error) {
     return "Ocorreu um erro ao obter resposta da inteligência artificial."
+  }
+}
+
+// Admin AI Chat - Função para o admin conversar com a IA sobre dados da base de dados
+export async function chatWithAdminAI(message: string): Promise<string> {
+  try {
+    // Primeiro, usar IA para determinar que dados buscar e construir a query
+    const queryAnalysisPrompt = `
+És um especialista em análise de dados e SQL. Analisa a pergunta do admin e determina que dados precisas buscar da base de dados.
+
+ESQUEMA DA BASE DE DADOS:
+- clients: id, phone, name, age, gender, height, weight, goal, activity_level, dietary_restrictions, created_at, updated_at, plan_text, last_context, paid, plan_url, ai_enabled, last_message_at, experience, available_days, health_conditions, exercise_preferences, equipment, motivation
+- chat_messages: id, client_id, role, content, created_at, read
+- conversations: id, client_id, state, last_interaction, context, created_at, updated_at
+- human_support_requests: id, client_id, status, original_message, created_at, resolved_at, handled_by, notes
+- pending_plans: id, client_id, plan_content, status, created_at
+- plans: id, client_id, type, pdf_url, created_at, expires_at, plan_content
+
+IMPORTANTE PARA CONTAGENS:
+- Para contar registos, usa "select": "count" (não "count(*)")
+- Para buscar dados específicos, usa "select": "campo1, campo2" ou "*"
+- Valores booleanos devem ser "true" ou "false" (sem aspas)
+- Datas devem estar no formato ISO: "2024-01-01"
+
+Responde APENAS com um JSON válido (sem markdown, sem explicações extras) no formato:
+{
+  "needsQuery": true/false,
+  "queries": [
+    {
+      "table": "nome_da_tabela",
+      "select": "campos_a_selecionar", 
+      "where": "condições_opcionais",
+      "orderBy": "ordenação_opcional",
+      "limit": número_opcional,
+      "description": "descrição_do_que_esta_query_vai_buscar"
+    }
+  ]
+}
+
+Se não precisar de queries específicas, retorna needsQuery: false.
+IMPORTANTE: Responde apenas o JSON, sem blocos de código ou qualquer outro texto.
+`;
+
+    const queryAnalysis = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: queryAnalysisPrompt },
+        { role: "user", content: `Pergunta: ${message}` }
+      ],
+      max_tokens: 500,
+      temperature: 0.1,
+    });
+
+    const queryResponse = queryAnalysis.choices[0].message?.content;
+    let queryData: any = {};
+    
+    try {
+      // Extrair JSON do markdown se necessário
+      let jsonString = queryResponse || '{"needsQuery": false, "queries": []}';
+      
+      // Se a resposta contém blocos de código markdown, extrair o JSON
+      const jsonMatch = jsonString.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        jsonString = jsonMatch[1];
+      }
+      
+      queryData = JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error('Erro ao fazer parse da resposta de análise:', parseError);
+      console.error('Resposta original:', queryResponse);
+      queryData = { needsQuery: false, queries: [] };
+    }
+
+    let databaseResults = '';
+
+    // Se precisar de queries, executá-las
+    if (queryData.needsQuery && queryData.queries && queryData.queries.length > 0) {
+      const queryResults = [];
+
+      for (const query of queryData.queries) {
+        try {
+          let supabaseQuery = supabase.from(query.table);
+          let isCountQuery = false;
+          
+          // Verificar se é uma query de contagem
+          if (query.select && (query.select.toLowerCase().includes('count') || query.select === '*')) {
+            if (query.select.toLowerCase().includes('count')) {
+              isCountQuery = true;
+              supabaseQuery = supabaseQuery.select('*', { count: 'exact', head: true });
+            } else {
+              supabaseQuery = supabaseQuery.select(query.select);
+            }
+          } else if (query.select) {
+            supabaseQuery = supabaseQuery.select(query.select);
+          } else {
+            supabaseQuery = supabaseQuery.select('*');
+          }
+
+          // Aplicar where conditions (parsing melhorado)
+          if (query.where) {
+            const whereConditions = query.where.split(' AND ');
+            for (const condition of whereConditions) {
+              const trimmedCondition = condition.trim();
+              
+              // Parsing para diferentes tipos de condições
+                             if (trimmedCondition.includes('=')) {
+                 const [field, value] = trimmedCondition.split('=').map((s: string) => s.trim());
+                 const cleanValue = value.replace(/['"]/g, '');
+                 
+                 // Converter valores booleanos
+                 if (cleanValue.toLowerCase() === 'true') {
+                   supabaseQuery = supabaseQuery.eq(field, true);
+                 } else if (cleanValue.toLowerCase() === 'false') {
+                   supabaseQuery = supabaseQuery.eq(field, false);
+                 } else {
+                   supabaseQuery = supabaseQuery.eq(field, cleanValue);
+                 }
+               } else if (trimmedCondition.includes('!=')) {
+                 const [field, value] = trimmedCondition.split('!=').map((s: string) => s.trim());
+                 const cleanValue = value.replace(/['"]/g, '');
+                 supabaseQuery = supabaseQuery.neq(field, cleanValue);
+               } else if (trimmedCondition.includes('>=')) {
+                 const [field, value] = trimmedCondition.split('>=').map((s: string) => s.trim());
+                 const cleanValue = value.replace(/['"]/g, '');
+                 supabaseQuery = supabaseQuery.gte(field, cleanValue);
+               } else if (trimmedCondition.includes('<=')) {
+                 const [field, value] = trimmedCondition.split('<=').map((s: string) => s.trim());
+                 const cleanValue = value.replace(/['"]/g, '');
+                 supabaseQuery = supabaseQuery.lte(field, cleanValue);
+               } else if (trimmedCondition.includes('>')) {
+                 const [field, value] = trimmedCondition.split('>').map((s: string) => s.trim());
+                 const cleanValue = value.replace(/['"]/g, '');
+                 supabaseQuery = supabaseQuery.gt(field, cleanValue);
+               } else if (trimmedCondition.includes('<')) {
+                 const [field, value] = trimmedCondition.split('<').map((s: string) => s.trim());
+                 const cleanValue = value.replace(/['"]/g, '');
+                 supabaseQuery = supabaseQuery.lt(field, cleanValue);
+               }
+            }
+          }
+
+          // Aplicar ordenação
+          if (query.orderBy && !isCountQuery) {
+            const [field, direction] = query.orderBy.split(' ');
+            supabaseQuery = supabaseQuery.order(field, { 
+              ascending: direction?.toLowerCase() !== 'desc' 
+            });
+          }
+
+          // Aplicar limit (não aplicar em queries de contagem)
+          if (query.limit && !isCountQuery) {
+            supabaseQuery = supabaseQuery.limit(query.limit);
+          }
+
+          const { data, error, count } = await supabaseQuery;
+
+          if (error) {
+            console.error(`Erro na query ${query.table}:`, error);
+            queryResults.push({
+              table: query.table,
+              description: query.description,
+              error: error.message,
+              data: null
+            });
+          } else {
+            queryResults.push({
+              table: query.table,
+              description: query.description,
+              data: isCountQuery ? null : data,
+              count: isCountQuery ? count : (data?.length || 0)
+            });
+          }
+        } catch (queryError) {
+          console.error(`Erro ao executar query ${query.table}:`, queryError);
+          queryResults.push({
+            table: query.table,
+            description: query.description,
+            error: 'Erro ao executar query',
+            data: null
+          });
+        }
+      }
+
+      // Formatar resultados para o contexto da IA
+      databaseResults = queryResults.map(result => {
+        if (result.error) {
+          return `${result.description}: Erro - ${result.error}`;
+        }
+        return `${result.description}: ${result.count} registos encontrados\n${JSON.stringify(result.data, null, 2)}`;
+      }).join('\n\n');
+    }
+
+    // Agora usar a IA para interpretar os resultados e responder
+    const interpretationPrompt = `
+És um assistente de IA especializado em análise de dados de um sistema de WhatsApp Bot para coaching de treino e nutrição.
+
+${databaseResults ? `
+DADOS OBTIDOS DA BASE DE DADOS:
+${databaseResults}
+` : `
+Não foram necessárias queries específicas para esta pergunta.
+`}
+
+Responde sempre em Português de Portugal, de forma clara e profissional. Analisa os dados, fornece insights úteis, identifica tendências e responde à pergunta específica do admin.
+
+Se não houve dados suficientes, explica o que seria necessário para obter uma resposta mais completa.
+`;
+
+    const finalResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: interpretationPrompt },
+        { role: "user", content: `Pergunta original: ${message}` }
+      ],
+      max_tokens: 1000,
+      temperature: 0.7,
+    });
+
+    return finalResponse.choices[0].message?.content || "Não foi possível gerar uma resposta.";
+
+  } catch (error) {
+    console.error('❌ Erro no chat com IA admin:', error);
+    return "Ocorreu um erro ao processar sua pergunta. Tente novamente ou verifique os logs para mais detalhes.";
   }
 }

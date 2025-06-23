@@ -4,6 +4,8 @@ import Dashboard from './components/Dashboard';
 import Conversations from './components/Conversations';
 import ClientProfile from './components/ClientProfile';
 import PendingPlans from './components/PendingPlans';
+import HumanSupportRequests from './components/HumanSupportRequests';
+import AdminAIChat from './components/AdminAIChat';
 import Sidebar from './components/Sidebar';
 
 function App() {
@@ -18,6 +20,8 @@ function App() {
             <Route path="/conversations/:clientId" element={<Conversations />} />
             <Route path="/client/:clientId" element={<ClientProfile />} />
             <Route path="/pending-plans" element={<PendingPlans />} />
+            <Route path="/human-support" element={<HumanSupportRequests />} />
+            <Route path="/admin-chat" element={<AdminAIChat />} />
           </Routes>
         </div>
       </div>

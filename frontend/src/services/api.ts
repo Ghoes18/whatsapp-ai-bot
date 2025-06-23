@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { HumanSupportRequest } from '../types/humanSupport';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/dashboard';
@@ -194,6 +195,26 @@ export const dashboardAPI = {
   // Conteúdo dos Planos
   getPlanContent: (planId: string): Promise<{ plan: PlanContent }> =>
     api.get(`/plans/${planId}/content`).then(response => response.data),
+
+  // 🚨 SUPORTE HUMANO
+  getHumanSupportRequests: (status?: string): Promise<HumanSupportRequest[]> => {
+    const params = status ? { status } : {};
+    return api.get('/human-support-requests', { params }).then(response => response.data);
+  },
+
+  updateHumanSupportRequest: (requestId: string, data: { 
+    status: 'pending' | 'in_progress' | 'resolved';
+    handledBy?: string;
+    notes?: string;
+  }): Promise<void> =>
+    api.put(`/human-support-requests/${requestId}`, data).then(response => response.data),
+
+  getHumanSupportRequestsCount: (): Promise<{ count: number }> =>
+    api.get('/human-support-requests/count').then(response => response.data),
+
+  // 🤖 ADMIN AI CHAT
+  chatWithAI: (message: string): Promise<{ message: string }> =>
+    api.post('/admin/chat', { message }).then(response => response.data),
 };
 
 export default api; 

@@ -49,6 +49,18 @@ CREATE TABLE public.conversations (
   CONSTRAINT conversations_pkey PRIMARY KEY (id),
   CONSTRAINT conversations_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
 );
+CREATE TABLE public.human_support_requests (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  client_id uuid,
+  status character varying DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying::text, 'in_progress'::character varying::text, 'resolved'::character varying::text])),
+  original_message text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  resolved_at timestamp with time zone,
+  handled_by text,
+  notes text,
+  CONSTRAINT human_support_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT human_support_requests_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+);
 CREATE TABLE public.pending_plans (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   client_id uuid,

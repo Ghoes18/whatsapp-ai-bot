@@ -227,10 +227,10 @@ export async function sendMessageToClient(
 
 // Alternar status da IA para um cliente
 export async function toggleAI(clientId: string): Promise<boolean> {
-  // Primeiro, buscar o status atual
+  // Primeiro, buscar o status atual e o número do cliente
   const { data: client, error: fetchError } = await supabase
     .from("clients")
-    .select("ai_enabled")
+    .select("ai_enabled, phone")
     .eq("id", clientId)
     .single();
 
@@ -239,7 +239,7 @@ export async function toggleAI(clientId: string): Promise<boolean> {
     throw fetchError;
   }
 
-  const currentStatus = client.ai_enabled ?? true; // Default to true if not set
+  const currentStatus = client.ai_enabled ?? true;
   const newStatus = !currentStatus;
 
   const { error } = await supabase
@@ -251,8 +251,19 @@ export async function toggleAI(clientId: string): Promise<boolean> {
     .eq("id", clientId);
 
   if (error) {
-    console.error("Erro ao atualizar status da IA:", error);
+    console.error("Erro ao alternar IA:", error);
     throw error;
+  }
+
+  // Se a IA foi reativada, enviar mensagem ao cliente
+  if (newStatus === true) {
+    const message = "🤖 Olá! A nossa IA foi reativada e já pode interagir comigo. Se precisar de ajuda humana, basta pedir.";
+    try {
+      await sendMessageToClient(clientId, message);
+      console.log(`✅ Mensagem de reativação da IA enviada para o cliente ${clientId}`);
+    } catch (msgError) {
+      console.error(`❌ Erro ao enviar mensagem de reativação da IA para o cliente ${clientId}:`, msgError);
+    }
   }
 
   return newStatus;
@@ -994,6 +1005,45 @@ export async function getUnreadMessageCounts(): Promise<{ [clientId: string]: nu
   }
 }
 
+// Marcar todas as mensagens de um cliente como lidas
+export async function markClientMessagesAsRead(clientId: string): Promise<{ success: boolean; markedCount: number }> {
+  try {
+    const { data: messages, error: fetchError } = await supabase
+      .from("chat_messages")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("role", "user")
+      .or("read.is.null,read.eq.false");
+
+    if (fetchError) {
+      console.error("Erro ao buscar mensagens não lidas:", fetchError);
+      throw fetchError;
+    }
+
+    if (!messages || messages.length === 0) {
+      return { success: true, markedCount: 0 };
+    }
+
+    const messageIds = messages.map((msg: { id: string }) => msg.id);
+    
+    const { error: updateError } = await supabase
+      .from("chat_messages")
+      .update({ read: true })
+      .in("id", messageIds);
+
+    if (updateError) {
+      console.error("Erro ao marcar mensagens como lidas:", updateError);
+      throw updateError;
+    }
+
+    console.log(`✅ ${messageIds.length} mensagens marcadas como lidas para o cliente ${clientId}`);
+    return { success: true, markedCount: messageIds.length };
+  } catch (error) {
+    console.error("Erro ao marcar mensagens como lidas:", error);
+    throw error;
+  }
+}
+
 // Função de debug para listar todos os planos
 export async function debugListAllPlans(): Promise<any[]> {
   try {
@@ -1017,3 +1067,4 @@ export async function debugListAllPlans(): Promise<any[]> {
     return [];
   }
 }
+

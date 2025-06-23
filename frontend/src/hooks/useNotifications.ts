@@ -5,6 +5,7 @@ import { realtimeService, type RealtimeMessage } from '../services/supabaseClien
 interface NotificationState {
   unreadMessages: number;
   pendingPlans: number;
+  humanSupportRequests: number;
   clientUnreadCounts: { [clientId: string]: number };
 }
 
@@ -12,6 +13,7 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<NotificationState>({
     unreadMessages: 0,
     pendingPlans: 0,
+    humanSupportRequests: 0,
     clientUnreadCounts: {},
   });
 
@@ -19,10 +21,11 @@ export function useNotifications() {
 
   const updateNotifications = useCallback(async () => {
     try {
-      // Buscar estatísticas do dashboard e contagens de mensagens não lidas em uma única chamada
-      const [stats, unreadCounts] = await Promise.all([
+      // Buscar estatísticas do dashboard, contagens de mensagens não lidas e solicitações de suporte humano
+      const [stats, unreadCounts, humanSupportCount] = await Promise.all([
         dashboardAPI.getDashboardStats(),
-        dashboardAPI.getUnreadMessageCounts()
+        dashboardAPI.getUnreadMessageCounts(),
+        dashboardAPI.getHumanSupportRequestsCount()
       ]);
       
       // Calcular total de mensagens não lidas somando todas as contagens por cliente
@@ -31,6 +34,7 @@ export function useNotifications() {
       setNotifications({
         unreadMessages: totalUnreadMessages, // Usar contagem real de mensagens não lidas
         pendingPlans: stats.pendingPlans,
+        humanSupportRequests: humanSupportCount.count,
         clientUnreadCounts: unreadCounts,
       });
     } catch (error) {
@@ -55,27 +59,7 @@ export function useNotifications() {
     }
   }, []);
 
-  // Handler para atualizações de mensagens (ex: marcadas como lidas)
-  const handleMessageUpdate = useCallback((message: RealtimeMessage) => {
-    // Se a mensagem foi marcada como lida, atualizar contadores
-    if (message.read && message.role === 'user') {
-      console.log('✅ Mensagem marcada como lida via Realtime:', message);
-      
-      setNotifications(prev => {
-        const newClientCount = Math.max(0, (prev.clientUnreadCounts[message.client_id] || 0) - 1);
-        const newTotalCount = Math.max(0, prev.unreadMessages - 1);
-        
-        return {
-          ...prev,
-          unreadMessages: newTotalCount,
-          clientUnreadCounts: {
-            ...prev.clientUnreadCounts,
-            [message.client_id]: newClientCount
-          }
-        };
-      });
-    }
-  }, []);
+
 
   // Inicializar notificações e Realtime
   useEffect(() => {

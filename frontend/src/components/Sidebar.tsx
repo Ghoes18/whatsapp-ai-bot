@@ -63,6 +63,28 @@ const BotIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
+const UserGroupIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"
+    />
+  </svg>
+)
+
+const ChatIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+    />
+  </svg>
+)
+
 const Sidebar: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -128,6 +150,19 @@ const Sidebar: React.FC = () => {
       badge: notifications.pendingPlans,
       gradient: "from-amber-500 to-orange-600",
     },
+    {
+      text: "Suporte Humano",
+      icon: UserGroupIcon,
+      path: "/human-support",
+      badge: notifications.humanSupportRequests,
+      gradient: "from-red-500 to-pink-600",
+    },
+    {
+      text: "Chat com IA",
+      icon: ChatIcon,
+      path: "/admin-chat",
+      gradient: "from-purple-500 to-purple-600",
+    },
   ]
 
   const isActive = (path: string) => {
@@ -140,10 +175,10 @@ const Sidebar: React.FC = () => {
   return (
     <>
       {/* Enhanced Mobile menu button - Fixed position */}
-      <div className="fixed z-50 lg:hidden top-4 left-4">
+      <div className="fixed top-4 left-4 z-50 lg:hidden">
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-3 transition-all duration-200 border border-gray-200 shadow-lg bg-white/90 backdrop-blur-sm rounded-xl hover:shadow-xl hover:bg-white"
+          className="p-3 rounded-xl border border-gray-200 shadow-lg backdrop-blur-sm transition-all duration-200 bg-white/90 hover:shadow-xl hover:bg-white"
           aria-label="Toggle menu"
         >
           {isMobileMenuOpen ? (
@@ -162,13 +197,13 @@ const Sidebar: React.FC = () => {
       `}
       >
         {/* Enhanced Header */}
-        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+        <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
           <div className="flex items-center space-x-4">
-            <div className="flex items-center justify-center w-12 h-12 shadow-lg rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600">
+            <div className="flex justify-center items-center w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
               <BotIcon className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-transparent bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text">
+              <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-700">
                 AI Bot
               </h1>
               <p className="text-sm font-medium text-gray-600">Dashboard</p>
@@ -206,7 +241,7 @@ const Sidebar: React.FC = () => {
                     <Icon className={`h-5 w-5 ${active ? "text-white" : "text-gray-500 group-hover:text-gray-700"}`} />
                   </div>
                   {item.badge && item.badge > 0 && (
-                    <span className="absolute flex items-center justify-center w-5 h-5 text-xs font-bold text-white rounded-full shadow-sm -top-1 -right-1 bg-gradient-to-r from-red-500 to-red-600">
+                    <span className="flex absolute -top-1 -right-1 justify-center items-center w-5 h-5 text-xs font-bold text-white bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-sm">
                       {item.badge > 99 ? "99+" : item.badge}
                     </span>
                   )}
@@ -219,7 +254,7 @@ const Sidebar: React.FC = () => {
 
                 {/* Active indicator */}
                 {active && (
-                  <div className="absolute right-0 w-1 h-8 transform -translate-y-1/2 rounded-l-full top-1/2 bg-gradient-to-b from-blue-500 to-indigo-600"></div>
+                  <div className="absolute right-0 top-1/2 w-1 h-8 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-l-full transform -translate-y-1/2"></div>
                 )}
               </button>
             )
@@ -229,8 +264,8 @@ const Sidebar: React.FC = () => {
         {/* Enhanced AI Toggle */}
         {sidebarClientId && aiEnabled !== null && (
           <div className="px-4 pb-6">
-            <div className="p-4 border border-gray-100 bg-gradient-to-r from-gray-50 to-white rounded-xl">
-              <div className="flex items-center justify-between mb-2">
+            <div className="p-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
+              <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-semibold text-gray-900">IA do Cliente</span>
                 <div className={`w-2 h-2 rounded-full ${aiEnabled ? "bg-emerald-500" : "bg-gray-400"}`}></div>
               </div>
@@ -247,8 +282,8 @@ const Sidebar: React.FC = () => {
                 `}
               >
                 {aiLoading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="w-4 h-4 mr-2 border-2 border-current rounded-full border-t-transparent animate-spin"></div>
+                  <div className="flex justify-center items-center">
+                    <div className="mr-2 w-4 h-4 rounded-full border-2 border-current animate-spin border-t-transparent"></div>
                     Atualizando...
                   </div>
                 ) : (
@@ -260,7 +295,7 @@ const Sidebar: React.FC = () => {
         )}
 
         {/* Enhanced Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+        <div className="absolute right-0 bottom-0 left-0 p-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100">
           <div className="text-center">
             <p className="text-xs font-medium text-gray-500">WhatsApp Bot v2.0</p>
             <p className="mt-1 text-xs text-gray-400">Powered by AI</p>
@@ -271,7 +306,7 @@ const Sidebar: React.FC = () => {
       {/* Enhanced Mobile overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 z-30 transition-opacity duration-300 bg-black/20 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-30 backdrop-blur-sm transition-opacity duration-300 bg-black/20 lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
