@@ -1,6 +1,23 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.admin_chat_messages (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  session_id text NOT NULL,
+  role text NOT NULL CHECK (role = ANY (ARRAY['user'::text, 'assistant'::text])),
+  content text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  last_interaction timestamp with time zone DEFAULT now(),
+  CONSTRAINT admin_chat_messages_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.admin_conversations (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  title text DEFAULT 'Nova Conversa'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  last_interaction timestamp with time zone DEFAULT now(),
+  CONSTRAINT admin_conversations_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.chat_messages (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   client_id uuid,

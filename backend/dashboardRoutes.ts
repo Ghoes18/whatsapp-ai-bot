@@ -20,6 +20,14 @@ import {
   markClientMessagesAsRead
 } from './src/services/dashboardService';
 import { chatWithAdminAI } from './src/services/openaiService';
+import { 
+  getAdminChatHistory, 
+  getAdminConversations,
+  createAdminConversation,
+  deleteAdminConversation,
+  getAdminConversation,
+  updateConversationTitle
+} from './src/services/adminChatHistoryService';
 
 const router = express.Router();
 
@@ -236,15 +244,90 @@ router.get('/debug/plans', async (req, res) => {
 // Admin AI Chat endpoint
 router.post('/admin/chat', async (req, res) => {
   try {
-    const { message } = req.body;
-    if (!message) {
-      return res.status(400).json({ error: 'Mensagem é obrigatória' });
+    const { message, conversationId } = req.body;
+    if (!message || !conversationId) {
+      return res.status(400).json({ error: 'Mensagem e conversationId são obrigatórios' });
     }
     
-    const response = await chatWithAdminAI(message);
+    const response = await chatWithAdminAI(message, conversationId);
     res.json({ message: response });
   } catch (error) {
     console.error('Erro no chat com IA admin:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Get all admin conversations
+router.get('/admin/conversations', async (req, res) => {
+  try {
+    const conversations = await getAdminConversations();
+    res.json({ conversations });
+  } catch (error) {
+    console.error('Erro ao buscar conversas do admin:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Create new admin conversation
+router.post('/admin/conversations', async (req, res) => {
+  try {
+    const { firstMessage } = req.body;
+    const conversationId = await createAdminConversation(firstMessage);
+    res.json({ conversationId });
+  } catch (error) {
+    console.error('Erro ao criar conversa do admin:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Get specific conversation details
+router.get('/admin/conversations/:conversationId', async (req, res) => {
+  try {
+    const conversation = await getAdminConversation(req.params.conversationId);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversa não encontrada' });
+    }
+    res.json({ conversation });
+  } catch (error) {
+    console.error('Erro ao buscar conversa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Get admin chat history for specific conversation
+router.get('/admin/conversations/:conversationId/history', async (req, res) => {
+  try {
+    const history = await getAdminChatHistory(req.params.conversationId);
+    res.json({ history });
+  } catch (error) {
+    console.error('Erro ao buscar histórico da conversa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Update conversation title
+router.put('/admin/conversations/:conversationId/title', async (req, res) => {
+  try {
+    const { title } = req.body;
+    if (!title) {
+      return res.status(400).json({ error: 'Título é obrigatório' });
+    }
+    
+    await updateConversationTitle(req.params.conversationId, title);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao atualizar título da conversa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Delete admin conversation
+router.delete('/admin/conversations/:conversationId', async (req, res) => {
+  try {
+    await deleteAdminConversation(req.params.conversationId);
+    res.json({ success: true, message: 'Conversa removida com sucesso' });
+  } catch (error) {
+    console.error('Erro ao remover conversa:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

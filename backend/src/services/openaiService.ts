@@ -1,14 +1,20 @@
 import OpenAI from "openai";
 import dotenv from "dotenv";
-import { getChatHistory, saveChatMessage } from './chatHistoryService';
-import { getPlanText, supabase } from './supabaseService';
-import { 
-  getDashboardStats, 
-  getRecentActivity, 
+import { getChatHistory, saveChatMessage } from "./chatHistoryService";
+import {
+  getAdminChatHistory,
+  saveAdminChatMessage,
+  getAdminConversation,
+} from "./adminChatHistoryService";
+import { getPlanText, supabase } from "./supabaseService";
+import {
+  getDashboardStats,
+  getRecentActivity,
   getPendingPlans,
   type RecentActivity,
-  type PendingPlan 
-} from './dashboardService';
+  type PendingPlan,
+} from "./dashboardService";
+import { readFile } from "fs/promises";
 dotenv.config();
 
 export interface ClientContext {
@@ -40,7 +46,7 @@ export async function generateTrainingAndNutritionPlan(
 És um coach PhD em treino e nutrição, altamente qualificado e profissional. O teu papel é criar planos detalhados e personalizados de treino e dieta, adaptados às características e objetivos do cliente. Sê motivacional, claro e organizado na resposta, usando sempre o Português de Portugal.
 `;
 
-const userPrompt = `
+  const userPrompt = `
 Cria um plano de treino personalizado e detalhado para o seguinte perfil:
 
 Nome: ${context.name}
@@ -49,13 +55,15 @@ Género: ${context.gender}
 Altura: ${context.height} cm
 Peso: ${context.weight} kg
 Objetivo: ${context.goal}
-Experiência: ${context.experience || 'Não especificada'}
-Dias disponíveis: ${context.available_days || 'Não especificados'}
-Condições de saúde: ${context.health_conditions || 'Nenhuma'}
-Preferências de exercício: ${context.exercise_preferences || 'Não especificadas'}
-Restrições alimentares: ${context.dietary_restrictions || 'Nenhuma'}
-Equipamento disponível: ${context.equipment || 'Não especificado'}
-Motivação: ${context.motivation || 'Não especificada'}
+Experiência: ${context.experience || "Não especificada"}
+Dias disponíveis: ${context.available_days || "Não especificados"}
+Condições de saúde: ${context.health_conditions || "Nenhuma"}
+Preferências de exercício: ${
+    context.exercise_preferences || "Não especificadas"
+  }
+Restrições alimentares: ${context.dietary_restrictions || "Nenhuma"}
+Equipamento disponível: ${context.equipment || "Não especificado"}
+Motivação: ${context.motivation || "Não especificada"}
 
 Se alguma informação do perfil do cliente estiver 'Não especificada', faz suposições razoáveis baseadas no objetivo geral (e.g., para 'ganho de massa muscular' e 'não especificada' em 'experiência', assume um nível iniciante a intermédio, a menos que o contexto sugira o contrário). No entanto, se a ausência de informação for crítica para a segurança ou eficácia do plano (e.g., 'condições de saúde'), indica claramente que a informação é necessária e que o plano é uma sugestão geral que requer validação profissional.
 
@@ -125,7 +133,9 @@ Mensagem de Motivação
   }
 }
 
-export async function detectHumanSupportRequest(message: string): Promise<boolean> {
+export async function detectHumanSupportRequest(
+  message: string
+): Promise<boolean> {
   const systemPrompt = `
 És um assistente especializado em análise de intenções. A tua tarefa é determinar se uma mensagem indica que a pessoa quer falar com um humano/atendente real em vez de continuar com IA.
 
@@ -161,10 +171,12 @@ Esta mensagem indica que a pessoa quer falar com um humano em vez da IA?`;
       temperature: 0.1, // Baixa temperatura para respostas mais consistentes
     });
 
-    const response = completion.choices[0].message?.content?.trim().toUpperCase();
+    const response = completion.choices[0].message?.content
+      ?.trim()
+      .toUpperCase();
     return response === "SIM";
   } catch (error) {
-    console.error('❌ Erro ao detectar solicitação de suporte humano:', error);
+    console.error("❌ Erro ao detectar solicitação de suporte humano:", error);
     // Em caso de erro, retorna false para não interromper o fluxo
     return false;
   }
@@ -195,13 +207,15 @@ Género: ${context.gender}
 Altura: ${context.height} cm
 Peso: ${context.weight} kg
 Objetivo: ${context.goal}
-Experiência: ${context.experience || 'Não especificada'}
-Dias disponíveis: ${context.available_days || 'Não especificados'}
-Condições de saúde: ${context.health_conditions || 'Nenhuma'}
-Preferências de exercício: ${context.exercise_preferences || 'Não especificadas'}
-Restrições alimentares: ${context.dietary_restrictions || 'Nenhuma'}
-Equipamento disponível: ${context.equipment || 'Não especificado'}
-Motivação: ${context.motivation || 'Não especificada'}
+Experiência: ${context.experience || "Não especificada"}
+Dias disponíveis: ${context.available_days || "Não especificados"}
+Condições de saúde: ${context.health_conditions || "Nenhuma"}
+Preferências de exercício: ${
+    context.exercise_preferences || "Não especificadas"
+  }
+Restrições alimentares: ${context.dietary_restrictions || "Nenhuma"}
+Equipamento disponível: ${context.equipment || "Não especificado"}
+Motivação: ${context.motivation || "Não especificada"}
 `;
 
   const userMessage: Message = {
@@ -210,7 +224,7 @@ Motivação: ${context.motivation || 'Não especificada'}
 ${userProfile}
 
 Plano personalizado do cliente:
-${planoTexto ? planoTexto : '[Plano não encontrado]'}
+${planoTexto ? planoTexto : "[Plano não encontrado]"}
 
 Pergunta: ${question}
 `,
@@ -236,30 +250,68 @@ Pergunta: ${question}
 
     return answer;
   } catch (error) {
-    return "Ocorreu um erro ao obter resposta da inteligência artificial."
+    return "Ocorreu um erro ao obter resposta da inteligência artificial.";
   }
 }
 
 // Admin AI Chat - Função para o admin conversar com a IA sobre dados da base de dados
-export async function chatWithAdminAI(message: string): Promise<string> {
+export async function chatWithAdminAI(
+  message: string,
+  conversationId: string
+): Promise<string> {
   try {
+    // Verificar se a conversa existe
+    const conversation = await getAdminConversation(conversationId);
+    if (!conversation) {
+      throw new Error("Conversa não encontrada");
+    }
+
+    // Recuperar histórico da conversa específica
+    const adminHistory = await getAdminChatHistory(conversationId);
+
+    // Salvar mensagem do usuário no histórico
+    await saveAdminChatMessage(conversationId, {
+      role: "user",
+      content: message,
+    });
+
+    // Ler o schema da base de dados dinamicamente
+    let dbSchema = "";
+    try {
+      dbSchema = await readFile(
+        require.resolve("../../databaseSchema.sql"),
+        "utf-8"
+      );
+    } catch (err) {
+      dbSchema = "-- Erro ao ler databaseSchema.sql";
+    }
+
     // Primeiro, usar IA para determinar que dados buscar e construir a query
     const queryAnalysisPrompt = `
-És um especialista em análise de dados e SQL. Analisa a pergunta do admin e determina que dados precisas buscar da base de dados.
+És um especialista em análise de dados e SQL. Analisa a pergunta do admin e determina que dados precisas buscar da base de dados
 
-ESQUEMA DA BASE DE DADOS:
-- clients: id, phone, name, age, gender, height, weight, goal, activity_level, dietary_restrictions, created_at, updated_at, plan_text, last_context, paid, plan_url, ai_enabled, last_message_at, experience, available_days, health_conditions, exercise_preferences, equipment, motivation
-- chat_messages: id, client_id, role, content, created_at, read
-- conversations: id, client_id, state, last_interaction, context, created_at, updated_at
-- human_support_requests: id, client_id, status, original_message, created_at, resolved_at, handled_by, notes
-- pending_plans: id, client_id, plan_content, status, created_at
-- plans: id, client_id, type, pdf_url, created_at, expires_at, plan_content
+ESQUEMA DA BASE DE DADOS (extraído do ficheiro databaseSchema.sql):
+${dbSchema}
+
+COISAS IMPORTANTES:
+- Se a pergunta for sobre planos pendentes, se o plano já foi aprovado, ele não está pendente.
+- Os numeros de telefone são sempre com o +351. Mas geralmente o admin nao vai usar o 351, vai usar no começo o numero 9... | entao para fazer a query, se o numero nao começar com 351, adiciona o 351 no começo. SEM O + exemplo: 912345678 -> 351912345678
+- NUNCA use subselects (SELECT ...) em condições WHERE. Se precisar filtrar por telefone, faça duas queries: 
+  1. Primeiro, busque o id do cliente pelo telefone.
+  2. Depois, use esse id na query desejada.
 
 IMPORTANTE PARA CONTAGENS:
 - Para contar registos, usa "select": "count" (não "count(*)")
 - Para buscar dados específicos, usa "select": "campo1, campo2" ou "*"
 - Valores booleanos devem ser "true" ou "false" (sem aspas)
 - Datas devem estar no formato ISO: "2024-01-01"
+
+CONTEXTO DA CONVERSA:
+${
+  adminHistory.length > 0
+    ? adminHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
+    : "Primeira interação"
+}
 
 Responde APENAS com um JSON válido (sem markdown, sem explicações extras) no formato:
 {
@@ -284,105 +336,145 @@ IMPORTANTE: Responde apenas o JSON, sem blocos de código ou qualquer outro text
       model: "gpt-4o",
       messages: [
         { role: "system", content: queryAnalysisPrompt },
-        { role: "user", content: `Pergunta: ${message}` }
+        { role: "user", content: `Pergunta atual: ${message}` },
       ],
-      max_tokens: 500,
-      temperature: 0.1,
+      max_tokens: 1000,
+      temperature: 0.7,
     });
 
     const queryResponse = queryAnalysis.choices[0].message?.content;
     let queryData: any = {};
-    
+
     try {
       // Extrair JSON do markdown se necessário
       let jsonString = queryResponse || '{"needsQuery": false, "queries": []}';
-      
       // Se a resposta contém blocos de código markdown, extrair o JSON
       const jsonMatch = jsonString.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
       if (jsonMatch) {
         jsonString = jsonMatch[1];
       }
-      
       queryData = JSON.parse(jsonString);
     } catch (parseError) {
-      console.error('Erro ao fazer parse da resposta de análise:', parseError);
-      console.error('Resposta original:', queryResponse);
+      console.error("Erro ao fazer parse da resposta de análise:", parseError);
+      console.error("Resposta original:", queryResponse);
       queryData = { needsQuery: false, queries: [] };
     }
 
-    let databaseResults = '';
+    // LOG: Pergunta do usuário e query gerada pela IA
+    console.log("[ADMIN AI CHAT]", {
+      pergunta: message,
+      queryGeradaPelaIA: JSON.stringify(queryData, null, 2),
+    });
+
+    let databaseResults = "";
 
     // Se precisar de queries, executá-las
-    if (queryData.needsQuery && queryData.queries && queryData.queries.length > 0) {
+    if (
+      queryData.needsQuery &&
+      queryData.queries &&
+      queryData.queries.length > 0
+    ) {
       const queryResults = [];
+      let idDoClienteObtido: string | null = null;
 
-      for (const query of queryData.queries) {
+      for (let i = 0; i < queryData.queries.length; i++) {
+        const query = { ...queryData.queries[i] };
+
+        // Substituir placeholder 'id_do_cliente' pelo valor real, se já foi obtido
+        if (idDoClienteObtido && query.where && query.where.includes("id_do_cliente")) {
+          query.where = query.where.replace(/'id_do_cliente'/g, `'${idDoClienteObtido}'`).replace(/id_do_cliente/g, idDoClienteObtido);
+        }
+
+        // Substituir placeholder '{id_obtido_na_primeira_query}' pelo valor real, se já foi obtido
+        if (idDoClienteObtido && query.where && query.where.includes("{id_obtido_na_primeira_query}")) {
+          query.where = query.where.replace(/{id_obtido_na_primeira_query}/g, idDoClienteObtido);
+        }
+
         try {
           let supabaseQuery = supabase.from(query.table);
           let isCountQuery = false;
-          
+
           // Verificar se é uma query de contagem
-          if (query.select && (query.select.toLowerCase().includes('count') || query.select === '*')) {
-            if (query.select.toLowerCase().includes('count')) {
+          if (
+            query.select &&
+            (query.select.toLowerCase().includes("count") ||
+              query.select === "*")
+          ) {
+            if (query.select.toLowerCase().includes("count")) {
               isCountQuery = true;
-              supabaseQuery = supabaseQuery.select('*', { count: 'exact', head: true });
+              supabaseQuery = supabaseQuery.select("*", {
+                count: "exact",
+                head: true,
+              });
             } else {
               supabaseQuery = supabaseQuery.select(query.select);
             }
           } else if (query.select) {
             supabaseQuery = supabaseQuery.select(query.select);
           } else {
-            supabaseQuery = supabaseQuery.select('*');
+            supabaseQuery = supabaseQuery.select("*");
           }
 
           // Aplicar where conditions (parsing melhorado)
           if (query.where) {
-            const whereConditions = query.where.split(' AND ');
+            const whereConditions = query.where.split(" AND ");
             for (const condition of whereConditions) {
               const trimmedCondition = condition.trim();
-              
+
               // Parsing para diferentes tipos de condições
-                             if (trimmedCondition.includes('=')) {
-                 const [field, value] = trimmedCondition.split('=').map((s: string) => s.trim());
-                 const cleanValue = value.replace(/['"]/g, '');
-                 
-                 // Converter valores booleanos
-                 if (cleanValue.toLowerCase() === 'true') {
-                   supabaseQuery = supabaseQuery.eq(field, true);
-                 } else if (cleanValue.toLowerCase() === 'false') {
-                   supabaseQuery = supabaseQuery.eq(field, false);
-                 } else {
-                   supabaseQuery = supabaseQuery.eq(field, cleanValue);
-                 }
-               } else if (trimmedCondition.includes('!=')) {
-                 const [field, value] = trimmedCondition.split('!=').map((s: string) => s.trim());
-                 const cleanValue = value.replace(/['"]/g, '');
-                 supabaseQuery = supabaseQuery.neq(field, cleanValue);
-               } else if (trimmedCondition.includes('>=')) {
-                 const [field, value] = trimmedCondition.split('>=').map((s: string) => s.trim());
-                 const cleanValue = value.replace(/['"]/g, '');
-                 supabaseQuery = supabaseQuery.gte(field, cleanValue);
-               } else if (trimmedCondition.includes('<=')) {
-                 const [field, value] = trimmedCondition.split('<=').map((s: string) => s.trim());
-                 const cleanValue = value.replace(/['"]/g, '');
-                 supabaseQuery = supabaseQuery.lte(field, cleanValue);
-               } else if (trimmedCondition.includes('>')) {
-                 const [field, value] = trimmedCondition.split('>').map((s: string) => s.trim());
-                 const cleanValue = value.replace(/['"]/g, '');
-                 supabaseQuery = supabaseQuery.gt(field, cleanValue);
-               } else if (trimmedCondition.includes('<')) {
-                 const [field, value] = trimmedCondition.split('<').map((s: string) => s.trim());
-                 const cleanValue = value.replace(/['"]/g, '');
-                 supabaseQuery = supabaseQuery.lt(field, cleanValue);
-               }
+              if (trimmedCondition.includes("=")) {
+                const [field, value] = trimmedCondition
+                  .split("=")
+                  .map((s: string) => s.trim());
+                const cleanValue = value.replace(/['"]/g, "");
+
+                // Converter valores booleanos
+                if (cleanValue.toLowerCase() === "true") {
+                  supabaseQuery = supabaseQuery.eq(field, true);
+                } else if (cleanValue.toLowerCase() === "false") {
+                  supabaseQuery = supabaseQuery.eq(field, false);
+                } else {
+                  supabaseQuery = supabaseQuery.eq(field, cleanValue);
+                }
+              } else if (trimmedCondition.includes("!=")) {
+                const [field, value] = trimmedCondition
+                  .split("!=")
+                  .map((s: string) => s.trim());
+                const cleanValue = value.replace(/['"]/g, "");
+                supabaseQuery = supabaseQuery.neq(field, cleanValue);
+              } else if (trimmedCondition.includes(">=")) {
+                const [field, value] = trimmedCondition
+                  .split(">=")
+                  .map((s: string) => s.trim());
+                const cleanValue = value.replace(/['"]/g, "");
+                supabaseQuery = supabaseQuery.gte(field, cleanValue);
+              } else if (trimmedCondition.includes("<=")) {
+                const [field, value] = trimmedCondition
+                  .split("<=")
+                  .map((s: string) => s.trim());
+                const cleanValue = value.replace(/['"]/g, "");
+                supabaseQuery = supabaseQuery.lte(field, cleanValue);
+              } else if (trimmedCondition.includes(">")) {
+                const [field, value] = trimmedCondition
+                  .split(">")
+                  .map((s: string) => s.trim());
+                const cleanValue = value.replace(/['"]/g, "");
+                supabaseQuery = supabaseQuery.gt(field, cleanValue);
+              } else if (trimmedCondition.includes("<")) {
+                const [field, value] = trimmedCondition
+                  .split("<")
+                  .map((s: string) => s.trim());
+                const cleanValue = value.replace(/['"]/g, "");
+                supabaseQuery = supabaseQuery.lt(field, cleanValue);
+              }
             }
           }
 
           // Aplicar ordenação
           if (query.orderBy && !isCountQuery) {
-            const [field, direction] = query.orderBy.split(' ');
-            supabaseQuery = supabaseQuery.order(field, { 
-              ascending: direction?.toLowerCase() !== 'desc' 
+            const [field, direction] = query.orderBy.split(" ");
+            supabaseQuery = supabaseQuery.order(field, {
+              ascending: direction?.toLowerCase() !== "desc",
             });
           }
 
@@ -393,20 +485,34 @@ IMPORTANTE: Responde apenas o JSON, sem blocos de código ou qualquer outro text
 
           const { data, error, count } = await supabaseQuery;
 
+          // Se esta é a primeira query e retorna um id de cliente, salvar para usar nas próximas
+          if (
+            i === 0 &&
+            query.table === "clients" &&
+            query.select &&
+            query.select.replace(/\s/g, "") === "id" &&
+            data &&
+            Array.isArray(data) &&
+            data.length > 0 &&
+            data[0].id
+          ) {
+            idDoClienteObtido = data[0].id;
+          }
+
           if (error) {
             console.error(`Erro na query ${query.table}:`, error);
             queryResults.push({
               table: query.table,
               description: query.description,
               error: error.message,
-              data: null
+              data: null,
             });
           } else {
             queryResults.push({
               table: query.table,
               description: query.description,
               data: isCountQuery ? null : data,
-              count: isCountQuery ? count : (data?.length || 0)
+              count: isCountQuery ? count : data?.length || 0,
             });
           }
         } catch (queryError) {
@@ -414,33 +520,50 @@ IMPORTANTE: Responde apenas o JSON, sem blocos de código ou qualquer outro text
           queryResults.push({
             table: query.table,
             description: query.description,
-            error: 'Erro ao executar query',
-            data: null
+            error: "Erro ao executar query",
+            data: null,
           });
         }
       }
 
       // Formatar resultados para o contexto da IA
-      databaseResults = queryResults.map(result => {
-        if (result.error) {
-          return `${result.description}: Erro - ${result.error}`;
-        }
-        return `${result.description}: ${result.count} registos encontrados\n${JSON.stringify(result.data, null, 2)}`;
-      }).join('\n\n');
+      databaseResults = queryResults
+        .map((result) => {
+          if (result.error) {
+            return `${result.description}: Erro - ${result.error}`;
+          }
+          return `${result.description}: ${
+            result.count
+          } registos encontrados\n${JSON.stringify(result.data, null, 2)}`;
+        })
+        .join("\n\n");
     }
 
     // Agora usar a IA para interpretar os resultados e responder
     const interpretationPrompt = `
 És um assistente de IA especializado em análise de dados de um sistema de WhatsApp Bot para coaching de treino e nutrição.
 
-${databaseResults ? `
+CONTEXTO DA CONVERSA ANTERIOR:
+${
+  adminHistory.length > 0
+    ? adminHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
+    : "Esta é a primeira interação"
+}
+
+${
+  databaseResults
+    ? `
 DADOS OBTIDOS DA BASE DE DADOS:
 ${databaseResults}
-` : `
+`
+    : `
 Não foram necessárias queries específicas para esta pergunta.
-`}
+`
+}
 
 Responde sempre em Português de Portugal, de forma clara e profissional. Analisa os dados, fornece insights úteis, identifica tendências e responde à pergunta específica do admin.
+
+Considera o contexto da conversa anterior para dar respostas mais relevantes e personalizadas. Se o admin fez perguntas relacionadas anteriormente, refere-te a elas quando apropriado.
 
 Se não houve dados suficientes, explica o que seria necessário para obter uma resposta mais completa.
 `;
@@ -449,16 +572,38 @@ Se não houve dados suficientes, explica o que seria necessário para obter uma 
       model: "gpt-4o",
       messages: [
         { role: "system", content: interpretationPrompt },
-        { role: "user", content: `Pergunta original: ${message}` }
+        { role: "user", content: `Pergunta original: ${message}` },
       ],
       max_tokens: 1000,
       temperature: 0.7,
     });
 
-    return finalResponse.choices[0].message?.content || "Não foi possível gerar uma resposta.";
+    const aiResponse =
+      finalResponse.choices[0].message?.content ||
+      "Não foi possível gerar uma resposta.";
 
+    // Salvar resposta da IA no histórico
+    await saveAdminChatMessage(conversationId, {
+      role: "assistant",
+      content: aiResponse,
+    });
+
+    return aiResponse;
   } catch (error) {
-    console.error('❌ Erro no chat com IA admin:', error);
-    return "Ocorreu um erro ao processar sua pergunta. Tente novamente ou verifique os logs para mais detalhes.";
+    console.error("❌ Erro no chat com IA admin:", error);
+    const errorMessage =
+      "Ocorreu um erro ao processar sua pergunta. Tente novamente ou verifique os logs para mais detalhes.";
+
+    // Salvar mensagem de erro no histórico
+    try {
+      await saveAdminChatMessage(conversationId, {
+        role: "assistant",
+        content: errorMessage,
+      });
+    } catch (saveError) {
+      console.error("❌ Erro ao salvar mensagem de erro:", saveError);
+    }
+
+    return errorMessage;
   }
 }

@@ -100,6 +100,14 @@ export interface RecentActivity {
   status: 'active' | 'pending' | 'completed';
 }
 
+export interface AdminConversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  last_interaction: string;
+}
+
 // API calls
 export const dashboardAPI = {
   // Dashboard
@@ -212,9 +220,28 @@ export const dashboardAPI = {
   getHumanSupportRequestsCount: (): Promise<{ count: number }> =>
     api.get('/human-support-requests/count').then(response => response.data),
 
-  // 🤖 ADMIN AI CHAT
-  chatWithAI: (message: string): Promise<{ message: string }> =>
-    api.post('/admin/chat', { message }).then(response => response.data),
+  // 🤖 ADMIN AI CHAT (Multiple Conversations)
+  chatWithAI: (message: string, conversationId: string): Promise<{ message: string }> =>
+    api.post('/admin/chat', { message, conversationId }).then(response => response.data),
+
+  // Conversations management
+  getAdminConversations: (): Promise<{ conversations: AdminConversation[] }> =>
+    api.get('/admin/conversations').then(response => response.data),
+
+  createAdminConversation: (firstMessage?: string): Promise<{ conversationId: string }> =>
+    api.post('/admin/conversations', { firstMessage }).then(response => response.data),
+
+  getAdminConversation: (conversationId: string): Promise<{ conversation: AdminConversation }> =>
+    api.get(`/admin/conversations/${conversationId}`).then(response => response.data),
+
+  getAdminChatHistory: (conversationId: string): Promise<{ history: { role: 'user' | 'assistant'; content: string }[] }> =>
+    api.get(`/admin/conversations/${conversationId}/history`).then(response => response.data),
+
+  updateConversationTitle: (conversationId: string, title: string): Promise<{ success: boolean }> =>
+    api.put(`/admin/conversations/${conversationId}/title`, { title }).then(response => response.data),
+
+  deleteAdminConversation: (conversationId: string): Promise<{ success: boolean; message: string }> =>
+    api.delete(`/admin/conversations/${conversationId}`).then(response => response.data),
 };
 
 export default api; 
