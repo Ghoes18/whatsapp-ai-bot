@@ -175,37 +175,70 @@ export class RealtimeService {
     // Remover subscription anterior se existir
     this.unsubscribe(subscriptionKey)
 
-    const channel = supabase
-      .channel('all-messages')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-        },
-        (payload) => {
-          onNewMessage(payload.new as RealtimeMessage)
-        }
-      )
-      .subscribe()
+    try {
+      const channel = supabase
+        .channel('all-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'chat_messages',
+          },
+          (payload) => {
+            onNewMessage(payload.new as RealtimeMessage)
+          }
+        )
+        .subscribe((status, err) => {
+          if (err) {
+            console.error(`❌ Erro na subscription de notificações:`, err)
+          }
+          
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Sistema de notificações conectado via Realtime')
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error(`❌ Erro no canal de notificações`)
+          } else if (status === 'TIMED_OUT') {
+            console.error(`⏰ Timeout na subscription de notificações`)
+          } else if (status === 'CLOSED') {
+            console.log('🔌 Canal de notificações fechado')
+          }
+        })
 
-    this.subscriptions.set(subscriptionKey, channel)
+      this.subscriptions.set(subscriptionKey, channel)
+      
+    } catch (error) {
+      console.error(`❌ Erro ao criar subscription de notificações:`, error)
+    }
   }
 
   // Remover uma subscription específica
   unsubscribe(subscriptionKey: string): void {
     const channel = this.subscriptions.get(subscriptionKey)
     if (channel) {
-      supabase.removeChannel(channel)
-      this.subscriptions.delete(subscriptionKey)
+      try {
+        // Verificar se o canal ainda está ativo antes de tentar remover
+        if (channel.state !== 'closed') {
+          supabase.removeChannel(channel)
+        }
+      } catch (error) {
+        console.warn(`⚠️ Erro ao remover canal ${subscriptionKey}:`, error)
+      } finally {
+        this.subscriptions.delete(subscriptionKey)
+      }
     }
   }
 
   // Remover todas as subscriptions
   unsubscribeAll(): void {
-    this.subscriptions.forEach((channel) => {
-      supabase.removeChannel(channel)
+    this.subscriptions.forEach((channel, key) => {
+      try {
+        if (channel.state !== 'closed') {
+          supabase.removeChannel(channel)
+        }
+      } catch (error) {
+        console.warn(`⚠️ Erro ao remover canal ${key}:`, error)
+      }
     })
     this.subscriptions.clear()
   }

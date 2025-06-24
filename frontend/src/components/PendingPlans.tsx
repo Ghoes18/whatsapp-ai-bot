@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { dashboardAPI } from "../services/api"
 import type { PendingPlan } from "../services/api"
 import { useNotifications } from "../hooks/useNotifications"
+import { formatPhoneNumber } from "../utils/phoneFormatter"
 
 // Enhanced SVG Icons with better styling
 const EditIcon = ({ className }: { className?: string }) => (
@@ -191,14 +192,14 @@ const PendingPlans: React.FC = () => {
         {/* Sidebar space */}
         <div className="hidden w-72 lg:block"></div>
 
-        <div className="flex items-center justify-center flex-1">
+        <div className="flex flex-1 justify-center items-center">
           <div className="text-center">
-            <div className="relative w-16 h-16 mx-auto mb-6">
-              <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-transparent rounded-full border-t-blue-600 animate-spin"></div>
+            <div className="relative mx-auto mb-6 w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-600"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin border-t-blue-600"></div>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">Carregando planos</h3>
-            <p className="text-gray-600">Buscando planos pendentes de aprovação...</p>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">Carregando planos</h3>
+            <p className="text-gray-600 dark:text-gray-400">Buscando planos pendentes de aprovação...</p>
           </div>
         </div>
       </div>
@@ -210,33 +211,33 @@ const PendingPlans: React.FC = () => {
       {/* Sidebar space */}
       <div className="hidden w-72 lg:block"></div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="overflow-auto flex-1">
         <div className="p-6 space-y-8">
           {/* Enhanced Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-transparent bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text">
+              <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300">
                 Planos Pendentes
               </h1>
-              <p className="mt-2 text-gray-600">Revise e aprove os planos gerados pela IA</p>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">Revise e aprove os planos gerados pela IA</p>
             </div>
             <button
               onClick={loadPendingPlans}
-              className="inline-flex items-center px-4 py-2 transition-all duration-200 bg-white border border-gray-300 shadow-sm rounded-xl hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group"
+              className="inline-flex items-center px-4 py-2 bg-white rounded-xl border border-gray-300 shadow-sm transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 hover:shadow-md hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 group"
             >
-              <RefreshIcon className="w-4 h-4 mr-2 text-gray-500 transition-colors group-hover:text-gray-700" />
-              <span className="font-medium text-gray-700 group-hover:text-gray-900">Atualizar</span>
+              <RefreshIcon className="mr-2 w-4 h-4 text-gray-500 transition-colors dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300" />
+              <span className="font-medium text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100">Atualizar</span>
             </button>
           </div>
 
           {!Array.isArray(pendingPlans) || pendingPlans.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="max-w-md p-12 mx-auto bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl">
-                <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-200 to-gray-300">
-                  <ScheduleIcon className="w-10 h-10 text-gray-500" />
+              <div className="p-12 mx-auto max-w-md bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl dark:from-gray-800 dark:to-gray-700">
+                <div className="flex justify-center items-center mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full dark:from-gray-600 dark:to-gray-500">
+                  <ScheduleIcon className="w-10 h-10 text-gray-500 dark:text-gray-400" />
                 </div>
-                <h3 className="mb-3 text-xl font-semibold text-gray-900">Tudo em dia!</h3>
-                <p className="leading-relaxed text-gray-600">
+                <h3 className="mb-3 text-xl font-semibold text-gray-900 dark:text-gray-100">Tudo em dia!</h3>
+                <p className="leading-relaxed text-gray-600 dark:text-gray-400">
                   Não há planos pendentes de aprovação no momento. Todos os planos gerados pela IA foram revisados.
                 </p>
               </div>
@@ -251,11 +252,11 @@ const PendingPlans: React.FC = () => {
                 return (
                   <div
                     key={plan.id}
-                    className="overflow-hidden transition-all duration-300 bg-white border border-gray-100 shadow-sm group rounded-2xl hover:shadow-xl hover:-translate-y-1"
+                    className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm transition-all duration-300 dark:bg-gray-800 dark:border-gray-700 group hover:shadow-xl hover:-translate-y-1"
                   >
                     {/* Card Header */}
                     <div className={`${planInfo.bgColor} p-6 border-b border-white/20`}>
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center space-x-3">
                           <div
                             className={`w-12 h-12 ${planInfo.iconBg} rounded-xl flex items-center justify-center shadow-lg`}
@@ -264,7 +265,7 @@ const PendingPlans: React.FC = () => {
                           </div>
                           <div>
                             <h3 className="text-lg font-bold text-gray-900">{planInfo.type}</h3>
-                            <p className="text-sm font-medium text-gray-600">{plan.client_phone}</p>
+                            <p className="text-sm font-medium text-gray-600">{formatPhoneNumber(plan.client_phone)}</p>
                           </div>
                         </div>
                         <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
@@ -277,8 +278,8 @@ const PendingPlans: React.FC = () => {
                     <div className="p-6">
                       <div className="mb-6">
                         <p className="mb-4 text-sm leading-relaxed text-gray-700 line-clamp-4">{plan.plan_content}</p>
-                        <div className="flex items-center px-3 py-2 text-xs text-gray-500 rounded-lg bg-gray-50">
-                          <div className="w-2 h-2 mr-2 bg-gray-400 rounded-full"></div>
+                        <div className="flex items-center px-3 py-2 text-xs text-gray-500 bg-gray-50 rounded-lg">
+                          <div className="mr-2 w-2 h-2 bg-gray-400 rounded-full"></div>
                           Criado em {formatDate(plan.created_at)}
                         </div>
                       </div>
@@ -314,9 +315,9 @@ const PendingPlans: React.FC = () => {
 
                     {/* Processing Overlay */}
                     {isProcessing && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-2xl">
+                      <div className="flex absolute inset-0 justify-center items-center rounded-2xl backdrop-blur-sm bg-white/80">
                         <div className="text-center">
-                          <div className="w-8 h-8 mx-auto mb-2 border-gray-300 rounded-full border-3 border-t-blue-600 animate-spin"></div>
+                          <div className="mx-auto mb-2 w-8 h-8 rounded-full border-gray-300 animate-spin border-3 border-t-blue-600"></div>
                           <p className="text-sm font-medium text-gray-700">Processando...</p>
                         </div>
                       </div>
@@ -329,20 +330,20 @@ const PendingPlans: React.FC = () => {
 
           {/* Enhanced Edit Modal */}
           {isEditModalOpen && selectedPlan && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="flex fixed inset-0 z-50 justify-center items-center p-4 backdrop-blur-sm bg-black/50">
               <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden">
                 {/* Modal Header */}
-                <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                  <div className="flex items-center justify-between">
+                <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
+                  <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900">Editar Plano</h2>
                       <p className="mt-1 text-gray-600">
-                        Cliente: <span className="font-medium">{selectedPlan.client_phone}</span>
+                        Cliente: <span className="font-medium">{formatPhoneNumber(selectedPlan.client_phone)}</span>
                       </p>
                     </div>
                     <button
                       onClick={() => setIsEditModalOpen(false)}
-                      className="p-2 transition-colors hover:bg-white/50 rounded-xl"
+                      className="p-2 rounded-xl transition-colors hover:bg-white/50"
                       aria-label="Fechar modal"
                     >
                       <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -353,20 +354,20 @@ const PendingPlans: React.FC = () => {
                 </div>
 
                 {/* Modal Content */}
-                <div className="flex-1 p-6 overflow-y-auto">
+                <div className="overflow-y-auto flex-1 p-6">
                   <div className="space-y-4">
                     <label className="block mb-2 text-sm font-semibold text-gray-900">Conteúdo do Plano</label>
                     <textarea
                       value={editedContent}
                       onChange={(e) => setEditedContent(e.target.value)}
-                      className="w-full p-4 transition-all duration-200 border border-gray-200 resize-none h-80 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white"
+                      className="p-4 w-full h-80 bg-gray-50 rounded-xl border border-gray-200 transition-all duration-200 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white"
                       placeholder="Conteúdo do plano..."
                     />
                   </div>
                 </div>
 
                 {/* Modal Footer */}
-                <div className="flex justify-end p-6 space-x-3 border-t border-gray-100 bg-gray-50">
+                <div className="flex justify-end p-6 space-x-3 bg-gray-50 border-t border-gray-100">
                   <button
                     onClick={() => setIsEditModalOpen(false)}
                     className="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
@@ -380,12 +381,12 @@ const PendingPlans: React.FC = () => {
                   >
                     {processingPlanId === selectedPlan.id ? (
                       <>
-                        <div className="w-4 h-4 mr-2 border-2 rounded-full border-white/30 border-t-white animate-spin"></div>
+                        <div className="mr-2 w-4 h-4 rounded-full border-2 animate-spin border-white/30 border-t-white"></div>
                         Processando...
                       </>
                     ) : (
                       <>
-                        <ApproveIcon className="w-4 h-4 mr-2" />
+                        <ApproveIcon className="mr-2 w-4 h-4" />
                         Aprovar com Edições
                       </>
                     )}

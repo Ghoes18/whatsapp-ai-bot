@@ -3,8 +3,8 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { dashboardAPI } from "../services/api";
-import type { DashboardStats, RecentActivity } from "../services/api";
-import { UserGroupIcon } from '@heroicons/react/24/outline';
+import type { DashboardStats, RecentActivity, AdvancedDashboardStats } from "../services/api";
+import { UserGroupIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 // Enhanced SVG Icons
 const ChatIcon = ({ className }: { className?: string }) => (
@@ -87,12 +87,57 @@ const RefreshIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const CurrencyDollarIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+    />
+  </svg>
+);
+
+const CalendarIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+    />
+  </svg>
+);
+
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalClients: 0,
     activeConversations: 0,
     pendingPlans: 0,
     todayMessages: 0,
+    humanSupportRequests: 0,
+    paidClients: 0,
+    weeklyPlans: 0,
+    conversionRate: 0,
+  });
+
+  const [advancedStats, setAdvancedStats] = useState<AdvancedDashboardStats>({
+    responseRate: 0,
+    avgResponseTime: "0 min",
+    goalDistribution: [],
+    clientGrowth: 0,
+    satisfactionScore: 0,
+    engagementRate: 0,
   });
 
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
@@ -105,12 +150,14 @@ const Dashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [statsData, activityData] = await Promise.all([
+      const [statsData, advancedStatsData, activityData] = await Promise.all([
         dashboardAPI.getDashboardStats(),
+        dashboardAPI.getAdvancedDashboardStats(),
         dashboardAPI.getRecentActivity(),
       ]);
 
       setStats(statsData);
+      setAdvancedStats(advancedStatsData);
       setRecentActivity(Array.isArray(activityData) ? activityData : []);
     } catch (error) {
       console.error("Erro ao carregar dados do dashboard:", error);
@@ -136,7 +183,7 @@ const Dashboard: React.FC = () => {
     return `${diffInDays}d atrás`;
   };
 
-  const statCards = [
+  const mainStatCards = [
     {
       title: "Total de Clientes",
       value: stats.totalClients,
@@ -171,6 +218,34 @@ const Dashboard: React.FC = () => {
     },
   ];
 
+  const secondaryStatCards = [
+    {
+      title: "Suporte Humano",
+      value: stats.humanSupportRequests,
+      icon: ExclamationTriangleIcon,
+      gradient: "from-red-500 to-pink-600",
+      bgGradient: "from-red-50 to-pink-50",
+      iconBg: "from-red-500 to-pink-600",
+    },
+    {
+      title: "Clientes Pagos",
+      value: stats.paidClients,
+      suffix: ` (${stats.conversionRate}%)`,
+      icon: CurrencyDollarIcon,
+      gradient: "from-green-500 to-emerald-600",
+      bgGradient: "from-green-50 to-emerald-50",
+      iconBg: "from-green-500 to-emerald-600",
+    },
+    {
+      title: "Planos da Semana",
+      value: stats.weeklyPlans,
+      icon: CalendarIcon,
+      gradient: "from-cyan-500 to-blue-600",
+      bgGradient: "from-cyan-50 to-blue-50",
+      iconBg: "from-cyan-500 to-blue-600",
+    },
+  ];
+
   const getActivityIcon = (type: string) => {
     switch (type) {
       case "message":
@@ -187,13 +262,13 @@ const Dashboard: React.FC = () => {
   const getStatusColor = (status?: string) => {
     switch (status) {
       case "active":
-        return "bg-gradient-to-r from-emerald-100 to-emerald-200 text-emerald-800";
+        return "bg-gradient-to-r from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-800/30 text-emerald-800 dark:text-emerald-300";
       case "pending":
-        return "bg-gradient-to-r from-amber-100 to-amber-200 text-amber-800";
+        return "bg-gradient-to-r from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-800/30 text-amber-800 dark:text-amber-300";
       case "completed":
-        return "bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800";
+        return "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300";
       default:
-        return "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800";
+        return "bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 text-gray-800 dark:text-gray-300";
     }
   };
 
@@ -203,16 +278,16 @@ const Dashboard: React.FC = () => {
         {/* Sidebar space */}
         <div className="hidden w-72 lg:block"></div>
 
-        <div className="flex items-center justify-center flex-1">
+        <div className="flex flex-1 justify-center items-center">
           <div className="text-center">
-            <div className="relative w-16 h-16 mx-auto mb-6">
-              <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-transparent rounded-full border-t-blue-600 animate-spin"></div>
+            <div className="relative mx-auto mb-6 w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-600"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin border-t-blue-600"></div>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
               Carregando dashboard
             </h3>
-            <p className="text-gray-600">Buscando dados mais recentes...</p>
+            <p className="text-gray-600 dark:text-gray-400">Buscando dados mais recentes...</p>
           </div>
         </div>
       </div>
@@ -224,46 +299,46 @@ const Dashboard: React.FC = () => {
       {/* Sidebar space */}
       <div className="hidden w-72 lg:block"></div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="overflow-auto flex-1">
         <div className="p-6 space-y-8">
           {/* Enhanced Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-transparent bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text">
+              <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300">
                 Dashboard
               </h1>
-              <p className="mt-2 text-gray-600">
+              <p className="mt-2 text-gray-600 dark:text-gray-400">
                 Visão geral do seu bot de WhatsApp
               </p>
             </div>
             <button
               onClick={loadDashboardData}
-              className="inline-flex items-center px-4 py-2 transition-all duration-200 bg-white border border-gray-300 shadow-sm rounded-xl hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group"
+              className="inline-flex items-center px-4 py-2 bg-white rounded-xl border border-gray-300 shadow-sm transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 hover:shadow-md hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 group"
             >
-              <RefreshIcon className="w-4 h-4 mr-2 text-gray-500 transition-colors group-hover:text-gray-700" />
-              <span className="font-medium text-gray-700 group-hover:text-gray-900">
+              <RefreshIcon className="mr-2 w-4 h-4 text-gray-500 transition-colors dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300" />
+              <span className="font-medium text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100">
                 Atualizar
               </span>
             </button>
           </div>
 
-          {/* Enhanced Stats Cards */}
+          {/* Main Stats Cards */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {statCards.map((card, index) => {
+            {mainStatCards.map((card, index) => {
               const Icon = card.icon;
               return (
                 <div
                   key={index}
-                  className={`relative overflow-hidden bg-gradient-to-br ${card.bgGradient} rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-white/20 group`}
+                  className={`relative overflow-hidden bg-gradient-to-br ${card.bgGradient} dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-white/20 dark:border-gray-700/20 group`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex justify-between items-center">
                     <div className="space-y-2">
                       <p
                         className={`text-3xl font-bold bg-gradient-to-r ${card.gradient} bg-clip-text text-transparent`}
                       >
                         {card.value.toLocaleString()}
                       </p>
-                      <p className="text-sm font-medium text-gray-700">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         {card.title}
                       </p>
                     </div>
@@ -275,7 +350,48 @@ const Dashboard: React.FC = () => {
                   </div>
 
                   {/* Decorative gradient overlay */}
-                  <div className="absolute inset-0 transition-opacity duration-300 opacity-0 bg-gradient-to-r from-white/10 to-transparent group-hover:opacity-100"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r to-transparent opacity-0 transition-opacity duration-300 from-white/10 group-hover:opacity-100"></div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Secondary Stats Cards */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            {secondaryStatCards.map((card, index) => {
+              const Icon = card.icon;
+              return (
+                <div
+                  key={index}
+                  className={`relative overflow-hidden bg-gradient-to-br ${card.bgGradient} dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-white/20 dark:border-gray-700/20 group`}
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="space-y-2">
+                      <div className="flex items-baseline">
+                        <p
+                          className={`text-2xl font-bold bg-gradient-to-r ${card.gradient} bg-clip-text text-transparent`}
+                        >
+                          {card.value.toLocaleString()}
+                        </p>
+                        {card.suffix && (
+                          <span className="ml-1 text-sm font-medium text-gray-600 dark:text-gray-400">
+                            {card.suffix}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {card.title}
+                      </p>
+                    </div>
+                    <div
+                      className={`p-3 rounded-xl bg-gradient-to-br ${card.iconBg} shadow-lg group-hover:scale-110 transition-transform duration-300`}
+                    >
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+
+                  {/* Decorative gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-r to-transparent opacity-0 transition-opacity duration-300 from-white/10 group-hover:opacity-100"></div>
                 </div>
               );
             })}
@@ -285,12 +401,12 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
             {/* Recent Activity */}
             <div className="lg:col-span-2">
-              <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-                <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                  <h2 className="text-xl font-bold text-gray-900">
+              <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                     Atividade Recente
                   </h2>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     Últimas interações do sistema
                   </p>
                 </div>
@@ -303,28 +419,28 @@ const Dashboard: React.FC = () => {
                         return (
                           <div
                             key={activity.id}
-                            className="flex items-start p-4 space-x-4 transition-all duration-200 rounded-xl hover:bg-gray-50 group"
+                            className="flex items-start p-4 space-x-4 rounded-xl transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-700 group"
                           >
                             <div className="flex-shrink-0">
-                              <div className="flex items-center justify-center w-12 h-12 transition-transform duration-200 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl group-hover:scale-110">
+                              <div className="flex justify-center items-center w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl transition-transform duration-200 dark:from-blue-900/30 dark:to-indigo-900/30 group-hover:scale-110">
                                 {ActivityIcon ? (
-                                  <ActivityIcon className="w-5 h-5 text-blue-600" />
+                                  <ActivityIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                 ) : (
-                                  <CircleIcon className="w-5 h-5 text-blue-600" />
+                                  <CircleIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                 )}
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between">
-                                <p className="text-sm font-medium leading-relaxed text-gray-900">
+                              <div className="flex justify-between items-start">
+                                <p className="text-sm font-medium leading-relaxed text-gray-900 dark:text-gray-100">
                                   {activity.content}
                                 </p>
-                                <span className="ml-4 text-xs font-medium text-gray-500 whitespace-nowrap">
+                                <span className="ml-4 text-xs font-medium text-gray-500 whitespace-nowrap dark:text-gray-400">
                                   {formatTimestamp(activity.timestamp)}
                                 </span>
                               </div>
                               {activity.clientName && (
-                                <p className="mt-1 text-sm text-gray-600">
+                                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                                   Cliente:{" "}
                                   <span className="font-medium">
                                     {activity.clientName}
@@ -347,13 +463,13 @@ const Dashboard: React.FC = () => {
                     </div>
                   ) : (
                     <div className="py-12 text-center">
-                      <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-gray-100 to-gray-200">
-                        <CircleIcon className="w-8 h-8 text-gray-400" />
+                      <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full dark:from-gray-700 dark:to-gray-800">
+                        <CircleIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                       </div>
-                      <h3 className="mb-2 text-lg font-medium text-gray-900">
+                      <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">
                         Nenhuma atividade
                       </h3>
-                      <p className="text-gray-500">
+                      <p className="text-gray-500 dark:text-gray-400">
                         As atividades recentes aparecerão aqui
                       </p>
                     </div>
@@ -364,65 +480,99 @@ const Dashboard: React.FC = () => {
 
             {/* Enhanced Sidebar */}
             <div className="space-y-6">
-              {/* Quick Summary */}
-              <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-                <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                  <h3 className="text-lg font-bold text-gray-900">
-                    Resumo Rápido
+              {/* Performance Metrics */}
+              <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    Performance
                   </h3>
                 </div>
                 <div className="p-6 space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <span className="text-sm font-medium text-gray-700">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Taxa de Resposta
                     </span>
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                      <span className="text-lg font-bold text-gray-900">
-                        95%
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                        {advancedStats.responseRate}%
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <span className="text-sm font-medium text-gray-700">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Tempo Médio
                     </span>
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-lg font-bold text-gray-900">
-                        2.3 min
+                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                        {advancedStats.avgResponseTime}
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <span className="text-sm font-medium text-gray-700">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Satisfação
                     </span>
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                      <span className="text-lg font-bold text-gray-900">
-                        4.8/5
+                      <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                        {advancedStats.satisfactionScore}/5
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Crescimento (7d)
+                    </span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                        +{advancedStats.clientGrowth}
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Top Goals */}
+              {advancedStats.goalDistribution.length > 0 && (
+                <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                  <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                      Objetivos Populares
+                    </h3>
+                  </div>
+                  <div className="p-6 space-y-3">
+                    {advancedStats.goalDistribution.map((goalData, index) => (
+                      <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
+                          {goalData.goal}
+                        </span>
+                        <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                          {goalData.count}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Quick Actions */}
-              <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-                <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                  <h3 className="text-lg font-bold text-gray-900">
+              <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     Ações Rápidas
                   </h3>
                 </div>
                 <div className="p-6 space-y-3">
-                  <button className="w-full px-4 py-3 font-medium text-white transition-all duration-200 shadow-sm bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-xl hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                  <button className="px-4 py-3 w-full font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-sm transition-all duration-200 hover:from-blue-600 hover:to-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
                     Nova Conversa
                   </button>
-                  <button className="w-full px-4 py-3 font-medium text-gray-700 transition-all duration-200 bg-white border border-gray-300 hover:border-gray-400 hover:text-gray-900 rounded-xl hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                  <button className="px-4 py-3 w-full font-medium text-gray-700 bg-white rounded-xl border border-gray-300 transition-all duration-200 dark:text-gray-300 dark:bg-gray-700 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-900 dark:hover:text-gray-100 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
                     Ver Relatórios
                   </button>
-                  <button className="w-full px-4 py-3 font-medium text-gray-700 transition-all duration-200 bg-white border border-gray-300 hover:border-gray-400 hover:text-gray-900 rounded-xl hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                  <button className="px-4 py-3 w-full font-medium text-gray-700 bg-white rounded-xl border border-gray-300 transition-all duration-200 dark:text-gray-300 dark:bg-gray-700 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-900 dark:hover:text-gray-100 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
                     Configurações
                   </button>
                 </div>

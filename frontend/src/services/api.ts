@@ -88,6 +88,27 @@ export interface DashboardStats {
   activeConversations: number;
   pendingPlans: number;
   todayMessages: number;
+  humanSupportRequests: number;
+  paidClients: number;
+  weeklyPlans: number;
+  conversionRate: number;
+}
+
+export interface AdvancedDashboardStats {
+  responseRate: number;
+  avgResponseTime: string;
+  goalDistribution: { goal: string; count: number }[];
+  clientGrowth: number;
+  satisfactionScore: number;
+  engagementRate: number;
+}
+
+export interface DashboardMetrics {
+  [date: string]: {
+    clients: number;
+    messages: number;
+    plans: number;
+  };
 }
 
 export interface RecentActivity {
@@ -113,6 +134,12 @@ export const dashboardAPI = {
   // Dashboard
   getDashboardStats: (): Promise<DashboardStats> =>
     api.get('/stats').then(response => response.data),
+
+  getAdvancedDashboardStats: (): Promise<AdvancedDashboardStats> =>
+    api.get('/stats/advanced').then(response => response.data),
+
+  getDashboardMetrics: (days?: number): Promise<DashboardMetrics> =>
+    api.get('/metrics', { params: days ? { days } : {} }).then(response => response.data),
 
   getUnreadMessageCounts: (): Promise<{ [clientId: string]: number }> =>
     api.get('/messages/unread-counts').then(response => response.data),
@@ -242,6 +269,23 @@ export const dashboardAPI = {
 
   deleteAdminConversation: (conversationId: string): Promise<{ success: boolean; message: string }> =>
     api.delete(`/admin/conversations/${conversationId}`).then(response => response.data),
+
+  deleteAllAdminConversations: (): Promise<{ 
+    success: boolean; 
+    message: string; 
+    deletedConversations: number; 
+    deletedMessages: number 
+  }> =>
+    api.delete('/admin/conversations').then(response => response.data),
+
+  // Test method to generate conversation title with AI
+  generateConversationTitle: (conversationId: string): Promise<{ 
+    success: boolean; 
+    message: string; 
+    oldTitle: string; 
+    newTitle: string 
+  }> =>
+    api.post(`/admin/conversations/${conversationId}/generate-title`).then(response => response.data),
 };
 
 export default api; 

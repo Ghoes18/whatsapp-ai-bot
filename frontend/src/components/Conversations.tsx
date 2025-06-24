@@ -11,6 +11,7 @@ import {
   type RealtimeMessage,
   type RealtimeClient,
 } from "../services/supabaseClient";
+import { formatPhoneNumber } from "../utils/phoneFormatter";
 
 // Enhanced SVG Icons
 const SendIcon = ({ className }: { className?: string }) => (
@@ -176,7 +177,7 @@ const UserProfileIcon = ({ className }: { className?: string }) => (
 const Conversations: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const { updateNotifications, decrementClientUnreadCount } =
+  const { notifications, updateNotifications, decrementClientUnreadCount } =
     useNotifications();
 
   const [clients, setClients] = useState<Client[]>([]);
@@ -188,7 +189,6 @@ const Conversations: React.FC = () => {
   const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -415,22 +415,9 @@ const Conversations: React.FC = () => {
 
   // Configurar subscriptions de clientes (geral)
   useEffect(() => {
-    // Monitorar mudanças no status de conexão
-    const checkConnection = () => {
-      const status = realtimeService.getConnectionStatus();
-      setRealtimeConnected(status === 'connected');
-    };
-    
-    // Verificar imediatamente
-    checkConnection();
-    
-    // Verificar periodicamente
-    const statusInterval = setInterval(checkConnection, 30000); // 30 segundos
-
     realtimeService.subscribeToClientsUpdates(handleRealtimeClientUpdate);
 
     return () => {
-      clearInterval(statusInterval);
       realtimeService.unsubscribe("clients_updates");
     };
   }, [handleRealtimeClientUpdate]);
@@ -546,7 +533,8 @@ const Conversations: React.FC = () => {
   const filteredClients = clients.filter(
     (client) =>
       client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.phone?.includes(searchTerm)
+      client.phone?.includes(searchTerm) ||
+      formatPhoneNumber(client.phone)?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (isLoadingClients) {
@@ -558,13 +546,13 @@ const Conversations: React.FC = () => {
         <div className="flex flex-1 justify-center items-center">
           <div className="text-center">
             <div className="relative mx-auto mb-6 w-16 h-16">
-              <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-600"></div>
               <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin border-t-blue-600"></div>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
               Carregando conversas
             </h3>
-            <p className="text-gray-600">Buscando clientes e mensagens...</p>
+            <p className="text-gray-600 dark:text-gray-400">Buscando clientes e mensagens...</p>
           </div>
         </div>
       </div>
@@ -576,21 +564,21 @@ const Conversations: React.FC = () => {
       {/* Sidebar space */}
       <div className="hidden w-72 lg:block"></div>
 
-      <div className="flex flex-1 bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="flex flex-1 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
         {/* Fixed Client List */}
-        <div className="flex flex-col w-full border-r border-gray-200 shadow-sm backdrop-blur-sm bg-white/80 lg:w-80">
+        <div className="flex flex-col w-full border-r border-gray-200 shadow-sm backdrop-blur-sm dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 lg:w-80">
           {/* Enhanced Header */}
-          <div className="p-6 bg-gradient-to-r from-white to-gray-50 border-b border-gray-100">
-            <h2 className="mb-4 text-xl font-bold text-gray-900">Conversas</h2>
+          <div className="p-6 bg-gradient-to-r from-white to-gray-50 border-b border-gray-100 dark:from-gray-900 dark:to-gray-800 dark:border-gray-700">
+            <h2 className="mb-4 text-xl font-bold text-gray-900 dark:text-gray-100">Conversas</h2>
 
             <div className="relative">
-              <SearchIcon className="absolute left-4 top-1/2 w-5 h-5 text-gray-400 transform -translate-y-1/2" />
+              <SearchIcon className="absolute left-4 top-1/2 w-5 h-5 text-gray-400 transform -translate-y-1/2 dark:text-gray-500" />
               <input
                 type="text"
                 placeholder="Buscar clientes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="py-3 pr-4 pl-12 w-full rounded-xl border border-gray-200 backdrop-blur-sm transition-all duration-200 bg-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:bg-white focus:bg-white"
+                className="py-3 pr-4 pl-12 w-full placeholder-gray-500 text-gray-900 rounded-xl border border-gray-200 backdrop-blur-sm transition-all duration-200 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 dark:text-gray-100 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-700 hover:bg-white dark:hover:bg-gray-800 focus:bg-white dark:focus:bg-gray-800"
               />
             </div>
           </div>
@@ -604,8 +592,8 @@ const Conversations: React.FC = () => {
                     key={client.id}
                     className={`p-4 m-2 rounded-xl transition-all duration-200 hover:shadow-md group border ${
                       clientId === client.id
-                        ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 shadow-sm"
-                        : "hover:bg-white/70 backdrop-blur-sm border-transparent hover:border-gray-200"
+                        ? "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-700 shadow-sm"
+                        : "hover:bg-white/70 dark:hover:bg-gray-800/70 backdrop-blur-sm border-transparent hover:border-gray-200 dark:hover:border-gray-600"
                     }`}
                   >
                     <div className="flex items-center space-x-4">
@@ -614,19 +602,28 @@ const Conversations: React.FC = () => {
                           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
                             clientId === client.id
                               ? "bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg"
-                              : "bg-gradient-to-br from-gray-100 to-gray-200 group-hover:from-blue-100 group-hover:to-indigo-100"
+                              : "bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 group-hover:from-blue-100 group-hover:to-indigo-100 dark:group-hover:from-blue-800/30 dark:group-hover:to-indigo-800/30"
                           }`}
                         >
                           <PersonIcon
                             className={`w-6 h-6 ${
                               clientId === client.id
                                 ? "text-white"
-                                : "text-gray-600 group-hover:text-blue-600"
+                                : "text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400"
                             }`}
                           />
                         </div>
-                        {client.last_message_at && (
-                          <div className="absolute -right-1 -bottom-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></div>
+
+                        {/* Badge de mensagens não lidas */}
+                        {notifications.clientUnreadCounts[client.id] > 0 && (
+                          <div className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 bg-red-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm">
+                            <span className="text-xs font-bold text-white px-1">
+                              {notifications.clientUnreadCounts[client.id] > 99 
+                                ? '99+' 
+                                : notifications.clientUnreadCounts[client.id]
+                              }
+                            </span>
+                          </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -634,18 +631,18 @@ const Conversations: React.FC = () => {
                           <p
                             className={`font-semibold truncate ${
                               clientId === client.id
-                                ? "text-blue-900"
-                                : "text-gray-900"
+                                ? "text-blue-900 dark:text-blue-300"
+                                : "text-gray-900 dark:text-gray-100"
                             }`}
                           >
                             {client.name ?? "Cliente"}
                           </p>
                         </div>
-                        <p className="mb-1 text-sm text-gray-600 truncate">
-                          {client.phone ?? "Sem telefone"}
+                        <p className="mb-1 text-sm text-gray-600 truncate dark:text-gray-400">
+                          {formatPhoneNumber(client.phone)}
                         </p>
                         {client.last_message_at && (
-                          <p className="text-xs text-gray-500 truncate">
+                          <p className="text-xs text-gray-500 truncate dark:text-gray-500">
                             Última mensagem:{" "}
                             {formatTime(client.last_message_at)}
                           </p>
@@ -660,7 +657,7 @@ const Conversations: React.FC = () => {
                         className={`flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                           clientId === client.id
                             ? "bg-blue-600 text-white shadow-sm"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                         }`}
                       >
                         <ChatIcon className="w-4 h-4 mr-1.5" />
@@ -668,7 +665,7 @@ const Conversations: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleClientProfileClick(client)}
-                        className="inline-flex justify-center items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white rounded-lg border border-gray-300 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md"
+                        className="inline-flex justify-center items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white rounded-lg border border-gray-300 shadow-sm transition-all duration-200 dark:text-gray-300 dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-md"
                         title="Ver perfil do cliente"
                         aria-label="Ver perfil do cliente"
                       >
@@ -680,13 +677,13 @@ const Conversations: React.FC = () => {
               </div>
             ) : (
               <div className="py-16 text-center">
-                <div className="flex justify-center items-center mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full">
-                  <PersonIcon className="w-10 h-10 text-gray-400" />
+                <div className="flex justify-center items-center mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full dark:from-gray-700 dark:to-gray-600">
+                  <PersonIcon className="w-10 h-10 text-gray-400 dark:text-gray-500" />
                 </div>
-                <h3 className="mb-2 text-lg font-medium text-gray-900">
+                <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">
                   Nenhum cliente encontrado
                 </h3>
-                <p className="text-gray-500">Tente ajustar sua busca</p>
+                <p className="text-gray-500 dark:text-gray-400">Tente ajustar sua busca</p>
               </div>
             )}
           </div>
@@ -697,34 +694,24 @@ const Conversations: React.FC = () => {
           {selectedClient ? (
             <>
               {/* Enhanced Conversation Header */}
-              <div className="p-6 border-b border-gray-100 shadow-sm backdrop-blur-sm bg-white/90">
+              <div className="p-6 border-b border-gray-100 shadow-sm backdrop-blur-sm dark:border-gray-700 bg-white/90 dark:bg-gray-900/90">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-4">
                     <div className="relative">
                       <div className="flex justify-center items-center w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full shadow-lg">
                         <PersonIcon className="w-6 h-6 text-white" />
                       </div>
-                      <div className="absolute -right-1 -bottom-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></div>
+
                     </div>
                     <div>
                       <div className="flex items-center space-x-2">
-                        <h3 className="text-lg font-bold text-gray-900">
-                          {selectedClient.name ?? selectedClient.phone}
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                          {selectedClient.name ?? formatPhoneNumber(selectedClient.phone)}
                         </h3>
-                        {/* Indicador de conexão Realtime */}
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            realtimeConnected ? "bg-green-500" : "bg-red-500"
-                          }`}
-                          title={
-                            realtimeConnected
-                              ? "Conectado ao Realtime"
-                              : "Desconectado do Realtime"
-                          }
-                        ></div>
+
                       </div>
-                      <p className="text-sm text-gray-600">
-                        {selectedClient.phone ?? "Sem telefone"}
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {formatPhoneNumber(selectedClient.phone)}
                       </p>
                     </div>
                   </div>
@@ -732,10 +719,10 @@ const Conversations: React.FC = () => {
                   {/* Profile Button */}
                   <button
                     onClick={() => handleClientProfileClick(selectedClient)}
-                    className="inline-flex items-center px-4 py-2 bg-white rounded-xl border border-gray-300 shadow-sm transition-all duration-200 hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group"
+                    className="inline-flex items-center px-4 py-2 bg-white rounded-xl border border-gray-300 shadow-sm transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 hover:shadow-md hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 group"
                   >
-                    <UserProfileIcon className="mr-2 w-4 h-4 text-gray-500 group-hover:text-gray-700" />
-                    <span className="font-medium text-gray-700 group-hover:text-gray-900">
+                    <UserProfileIcon className="mr-2 w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300" />
+                    <span className="font-medium text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100">
                       Ver Perfil
                     </span>
                   </button>
@@ -743,12 +730,12 @@ const Conversations: React.FC = () => {
               </div>
 
               {/* Enhanced Messages */}
-              <div className="overflow-y-auto flex-1 p-6 space-y-4 bg-gradient-to-b from-gray-50/50 to-white/50">
+              <div className="overflow-y-auto flex-1 p-6 space-y-4 bg-gradient-to-b from-gray-50/50 to-white/50 dark:from-gray-900/50 dark:to-gray-800/50">
                 {isLoadingMessages ? (
                   <div className="flex justify-center items-center h-32">
                     <div className="text-center">
-                      <div className="mx-auto mb-3 w-8 h-8 rounded-full border-gray-300 animate-spin border-3 border-t-blue-600"></div>
-                      <p className="text-sm text-gray-600">
+                      <div className="mx-auto mb-3 w-8 h-8 rounded-full border-gray-300 animate-spin dark:border-gray-600 border-3 border-t-blue-600"></div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
                         Carregando mensagens...
                       </p>
                     </div>
@@ -767,7 +754,7 @@ const Conversations: React.FC = () => {
                         className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md ${
                           message.role === "assistant"
                             ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white"
-                            : "bg-white border border-gray-200 text-gray-900"
+                            : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                         }`}
                       >
                         <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
@@ -777,7 +764,7 @@ const Conversations: React.FC = () => {
                           className={`flex items-center justify-end mt-2 ${
                             message.role === "assistant"
                               ? "text-blue-100"
-                              : "text-gray-500"
+                              : "text-gray-500 dark:text-gray-400"
                           }`}
                         >
                           <span className="text-xs font-medium">
@@ -792,13 +779,13 @@ const Conversations: React.FC = () => {
                   ))
                 ) : (
                   <div className="py-16 text-center">
-                    <div className="flex justify-center items-center mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full">
-                      <AIIcon className="w-10 h-10 text-blue-600" />
+                    <div className="flex justify-center items-center mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full dark:from-blue-900/30 dark:to-indigo-900/30">
+                      <AIIcon className="w-10 h-10 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <h3 className="mb-2 text-lg font-medium text-gray-900">
+                    <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">
                       Nenhuma mensagem ainda
                     </h3>
-                    <p className="text-gray-500">
+                    <p className="text-gray-500 dark:text-gray-400">
                       Inicie uma conversa com este cliente!
                     </p>
                   </div>
@@ -807,17 +794,17 @@ const Conversations: React.FC = () => {
               </div>
 
               {/* Enhanced Message Input */}
-              <div className="p-6 border-t border-gray-100 shadow-sm backdrop-blur-sm bg-white/90">
+              <div className="p-6 border-t border-gray-100 shadow-sm backdrop-blur-sm dark:border-gray-700 bg-white/90 dark:bg-gray-900/90">
                 <div className="flex items-center space-x-3">
                   <button
-                    className="p-3 text-gray-400 rounded-xl transition-all duration-200 hover:text-gray-600 hover:bg-gray-100"
+                    className="p-3 text-gray-400 rounded-xl transition-all duration-200 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     title="Anexar arquivo"
                     aria-label="Anexar arquivo"
                   >
                     <AttachFileIcon className="w-5 h-5" />
                   </button>
                   <button
-                    className="p-3 text-gray-400 rounded-xl transition-all duration-200 hover:text-gray-600 hover:bg-gray-100"
+                    className="p-3 text-gray-400 rounded-xl transition-all duration-200 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     title="Enviar imagem"
                     aria-label="Enviar imagem"
                   >
@@ -832,11 +819,11 @@ const Conversations: React.FC = () => {
                       placeholder="Digite sua mensagem..."
                       disabled={isSendingMessage}
                       rows={1}
-                      className="px-4 py-3 w-full rounded-xl border border-gray-200 backdrop-blur-sm transition-all duration-200 resize-none bg-white/70 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 hover:bg-white focus:bg-white"
+                      className="px-4 py-3 w-full placeholder-gray-500 text-gray-900 rounded-xl border border-gray-200 backdrop-blur-sm transition-all duration-200 resize-none dark:border-gray-600 bg-white/70 dark:bg-gray-800/70 dark:text-gray-100 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-700 hover:bg-white dark:hover:bg-gray-800 focus:bg-white dark:focus:bg-gray-800"
                     />
                   </div>
                   <button
-                    className="p-3 text-gray-400 rounded-xl transition-all duration-200 hover:text-gray-600 hover:bg-gray-100"
+                    className="p-3 text-gray-400 rounded-xl transition-all duration-200 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     title="Gravar áudio"
                     aria-label="Gravar áudio"
                   >
@@ -845,7 +832,7 @@ const Conversations: React.FC = () => {
                   <button
                     onClick={handleSendMessage}
                     disabled={!newMessage.trim() || isSendingMessage}
-                    className="p-3 text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-sm transition-all duration-200 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    className="p-3 text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-sm transition-all duration-200 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                     title="Enviar mensagem"
                     aria-label="Enviar mensagem"
                   >
@@ -859,15 +846,15 @@ const Conversations: React.FC = () => {
               </div>
             </>
           ) : (
-            <div className="flex flex-1 justify-center items-center bg-gradient-to-br from-gray-50 to-white">
+            <div className="flex flex-1 justify-center items-center bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
               <div className="text-center">
-                <div className="flex justify-center items-center mx-auto mb-6 w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full shadow-lg">
-                  <ChatIcon className="w-12 h-12 text-blue-600" />
+                <div className="flex justify-center items-center mx-auto mb-6 w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full shadow-lg dark:from-blue-900/30 dark:to-indigo-900/30">
+                  <ChatIcon className="w-12 h-12 text-blue-600 dark:text-blue-400" />
                 </div>
-                <h3 className="mb-3 text-xl font-bold text-gray-900">
+                <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">
                   Selecione uma conversa
                 </h3>
-                <p className="max-w-sm text-gray-600">
+                <p className="max-w-sm text-gray-600 dark:text-gray-400">
                   Escolha um cliente da lista para começar a conversar e
                   gerenciar suas mensagens
                 </p>

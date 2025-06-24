@@ -16,6 +16,8 @@ const AdminAIChat: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [selectedConversationsToDelete, setSelectedConversationsToDelete] = useState<string[]>([]);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -123,6 +125,73 @@ const AdminAIChat: React.FC = () => {
     }
   };
 
+  const deleteSelectedConversations = async () => {
+    if (selectedConversationsToDelete.length === 0) {
+      alert('Selecione pelo menos uma conversa para apagar.');
+      return;
+    }
+
+    if (!confirm(`Tem certeza que deseja apagar ${selectedConversationsToDelete.length} conversa(s)?`)) {
+      return;
+    }
+
+    try {
+      // Apagar cada conversa selecionada
+      for (const conversationId of selectedConversationsToDelete) {
+        await dashboardAPI.deleteAdminConversation(conversationId);
+      }
+      
+      await loadConversations();
+      setSelectedConversationsToDelete([]);
+      
+      // Se a conversa atual foi apagada, limpar seleção
+      if (currentConversationId && selectedConversationsToDelete.includes(currentConversationId)) {
+        setCurrentConversationId(null);
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Erro ao apagar conversas selecionadas:', error);
+      alert('Erro ao apagar conversas. Tente novamente.');
+    }
+  };
+
+  const deleteAllConversations = async () => {
+    if (!confirm('Tem certeza que deseja apagar TODAS as conversas? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      setIsDeletingAll(true);
+      const result = await dashboardAPI.deleteAllAdminConversations();
+      await loadConversations();
+      setCurrentConversationId(null);
+      setMessages([]);
+      setSelectedConversationsToDelete([]);
+      alert(result.message);
+    } catch (error) {
+      console.error('Erro ao apagar todas as conversas:', error);
+      alert('Erro ao apagar todas as conversas. Tente novamente.');
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+
+  const handleConversationSelect = (conversationId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedConversationsToDelete(prev => [...prev, conversationId]);
+    } else {
+      setSelectedConversationsToDelete(prev => prev.filter(id => id !== conversationId));
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedConversationsToDelete.length === conversations.length) {
+      setSelectedConversationsToDelete([]);
+    } else {
+      setSelectedConversationsToDelete(conversations.map(c => c.id));
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !currentConversationId) return;
 
@@ -213,17 +282,17 @@ const AdminAIChat: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {/* Sidebar space para Sidebar.tsx */}
       <div className="hidden w-72 lg:block"></div>
 
       {/* Conversations Sidebar */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="flex flex-col w-80 bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={createNewConversation}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center space-x-2"
+            className="flex justify-center items-center px-4 py-2 space-x-2 w-full text-white bg-blue-600 rounded-lg transition-colors duration-200 hover:bg-blue-700"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -233,43 +302,81 @@ const AdminAIChat: React.FC = () => {
         </div>
 
         {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="overflow-y-auto flex-1">
           {isLoadingConversations ? (
             <div className="flex justify-center items-center h-32">
-              <div className="w-5 h-5 rounded-full border-2 animate-spin border-gray-300 border-t-blue-500"></div>
+              <div className="w-5 h-5 rounded-full border-2 border-gray-300 animate-spin dark:border-gray-600 border-t-blue-500"></div>
             </div>
           ) : conversations.length === 0 ? (
-            <div className="p-4 text-gray-500 text-center">
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
               <p>Nenhuma conversa encontrada.</p>
-              <p className="text-sm mt-1">Crie uma nova conversa para começar.</p>
+              <p className="mt-1 text-sm">Crie uma nova conversa para começar.</p>
             </div>
           ) : (
             <div className="p-2 space-y-1">
+              {/* Select All Checkbox */}
+              <div className="flex justify-between items-center p-2 mb-2 bg-gray-50 rounded-lg dark:bg-gray-700">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedConversationsToDelete.length === conversations.length && conversations.length > 0}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    aria-label="Selecionar todas as conversas"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Selecionar Todas ({selectedConversationsToDelete.length}/{conversations.length})
+                  </span>
+                </label>
+                {selectedConversationsToDelete.length > 0 && (
+                  <button
+                    onClick={deleteSelectedConversations}
+                    className="px-2 py-1 text-xs text-white bg-red-500 rounded transition-colors hover:bg-red-600"
+                    title={`Apagar ${selectedConversationsToDelete.length} conversa(s)`}
+                  >
+                    Apagar
+                  </button>
+                )}
+              </div>
+
               {conversations.map((conversation) => (
                 <div
                   key={conversation.id}
                   className={`group p-3 rounded-lg cursor-pointer transition-all duration-200 ${
                     currentConversationId === conversation.id
-                      ? 'bg-blue-50 border border-blue-200'
-                      : 'hover:bg-gray-50'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700'
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                   onClick={() => setCurrentConversationId(conversation.id)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">
-                        {conversation.title}
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {formatDate(conversation.last_interaction)}
-                      </p>
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-1 items-start space-x-2 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedConversationsToDelete.includes(conversation.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleConversationSelect(conversation.id, e.target.checked);
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mt-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Selecionar conversa: ${conversation.title}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium text-gray-900 truncate dark:text-gray-100">
+                          {conversation.title}
+                        </h3>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {formatDate(conversation.last_interaction)}
+                        </p>
+                      </div>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteConversation(conversation.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all duration-200"
+                      className="p-1 text-gray-400 opacity-0 transition-all duration-200 dark:text-gray-500 group-hover:opacity-100 hover:text-red-500"
                       title="Apagar conversa"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -282,14 +389,39 @@ const AdminAIChat: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Sidebar Footer - Delete All Button */}
+        {conversations.length > 0 && (
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={deleteAllConversations}
+              disabled={isDeletingAll}
+              className="flex justify-center items-center px-4 py-2 space-x-2 w-full text-white bg-red-600 rounded-lg transition-colors duration-200 hover:bg-red-700 disabled:bg-red-400"
+            >
+              {isDeletingAll ? (
+                <>
+                  <div className="w-4 h-4 rounded-full border-2 animate-spin border-white/30 border-t-white"></div>
+                  <span>Apagando...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span>Apagar Todas as Conversas</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex flex-col flex-1">
         {currentConversationId ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-200 bg-white">
+            <div className="p-4 bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center space-x-3">
                 <div className="flex justify-center items-center w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full">
                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -297,8 +429,8 @@ const AdminAIChat: React.FC = () => {
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-lg font-semibold text-gray-900">Chat com IA Admin</h1>
-                  <p className="text-sm text-gray-600">
+                  <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Chat com IA Admin</h1>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     {conversations.find(c => c.id === currentConversationId)?.title || 'Conversa'}
                   </p>
                 </div>
@@ -307,14 +439,14 @@ const AdminAIChat: React.FC = () => {
 
             {/* Example Questions (only show if no messages or just welcome message) */}
             {messages.length <= 1 && (
-              <div className="p-4 bg-gray-50 border-b border-gray-200">
-                <p className="mb-3 text-sm font-medium text-gray-700">Perguntas de exemplo:</p>
+              <div className="p-4 bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">Perguntas de exemplo:</p>
                 <div className="flex flex-wrap gap-2">
                   {exampleQuestions.map((question, index) => (
                     <button
                       key={index}
                       onClick={() => handleExampleClick(question)}
-                      className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-full hover:bg-gray-50 hover:border-blue-300 transition-colors duration-200"
+                      className="px-3 py-1.5 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-blue-300 dark:hover:border-blue-500 transition-colors duration-200 text-gray-700 dark:text-gray-300"
                     >
                       {question}
                     </button>
@@ -324,11 +456,11 @@ const AdminAIChat: React.FC = () => {
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="overflow-y-auto flex-1 p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
               {isLoadingHistory ? (
                 <div className="flex justify-center items-center h-32">
-                  <div className="flex items-center space-x-3 text-gray-500">
-                    <div className="w-5 h-5 rounded-full border-2 animate-spin border-gray-300 border-t-blue-500"></div>
+                  <div className="flex items-center space-x-3 text-gray-500 dark:text-gray-400">
+                    <div className="w-5 h-5 rounded-full border-2 border-gray-300 animate-spin dark:border-gray-600 border-t-blue-500"></div>
                     <span>Carregando histórico...</span>
                   </div>
                 </div>
@@ -342,11 +474,11 @@ const AdminAIChat: React.FC = () => {
                       className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md ${
                         message.role === 'user'
                           ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
-                          : 'bg-white border border-gray-200 text-gray-900'
+                          : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100'
                       }`}
                     >
                       <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</div>
-                      <div className={`flex items-center justify-end mt-2 ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
+                      <div className={`flex items-center justify-end mt-2 ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
                         <span className="text-xs font-medium">{formatTime(message.timestamp)}</span>
                       </div>
                     </div>
@@ -361,11 +493,11 @@ const AdminAIChat: React.FC = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                     </div>
-                    <div className="px-4 py-3 bg-gray-100 rounded-2xl">
+                    <div className="px-4 py-3 bg-gray-100 rounded-2xl dark:bg-gray-700">
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce dark:bg-gray-500"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce dark:bg-gray-500" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce dark:bg-gray-500" style={{ animationDelay: '0.2s' }}></div>
                       </div>
                     </div>
                   </div>
@@ -375,7 +507,7 @@ const AdminAIChat: React.FC = () => {
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-gray-200 bg-white">
+            <div className="p-4 bg-white border-t border-gray-200 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center space-x-3">
                 <div className="relative flex-1">
                   <textarea
@@ -383,7 +515,7 @@ const AdminAIChat: React.FC = () => {
                     onChange={(e) => setInputMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Digite sua pergunta sobre a base de dados..."
-                    className="px-4 py-3 w-full rounded-xl border border-gray-200 transition-all duration-200 resize-none bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                    className="px-4 py-3 w-full placeholder-gray-500 text-gray-900 bg-white rounded-xl border border-gray-200 transition-all duration-200 resize-none dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
                     rows={1}
                     disabled={isLoading}
                   />
@@ -391,7 +523,7 @@ const AdminAIChat: React.FC = () => {
                 <button
                   onClick={handleSendMessage}
                   disabled={!inputMessage.trim() || isLoading}
-                  className="p-3 text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-sm transition-all duration-200 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  className="p-3 text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-sm transition-all duration-200 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                   title="Enviar mensagem"
                   aria-label="Enviar mensagem"
                 >
@@ -408,18 +540,18 @@ const AdminAIChat: React.FC = () => {
           </>
         ) : (
           /* No Conversation Selected */
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-1 justify-center items-center bg-gray-50 dark:bg-gray-900">
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+              <div className="flex justify-center items-center mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Chat com IA Admin</h2>
-              <p className="text-gray-600 mb-4">Selecione uma conversa ou crie uma nova para começar</p>
+              <h2 className="mb-2 text-xl font-semibold text-gray-900 dark:text-gray-100">Chat com IA Admin</h2>
+              <p className="mb-4 text-gray-600 dark:text-gray-400">Selecione uma conversa ou crie uma nova para começar</p>
               <button
                 onClick={createNewConversation}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                className="px-6 py-2 text-white bg-blue-600 rounded-lg transition-colors duration-200 hover:bg-blue-700"
               >
                 Nova Conversa
               </button>

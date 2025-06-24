@@ -17,7 +17,9 @@ import {
   getPlanContent,
   saveApprovedPlan,
   debugListAllPlans,
-  markClientMessagesAsRead
+  markClientMessagesAsRead,
+  getAdvancedDashboardStats,
+  getDashboardMetrics
 } from './src/services/dashboardService';
 import { chatWithAdminAI } from './src/services/openaiService';
 import { 
@@ -26,8 +28,10 @@ import {
   createAdminConversation,
   deleteAdminConversation,
   getAdminConversation,
-  updateConversationTitle
+  updateConversationTitle,
+  deleteAllAdminConversations
 } from './src/services/adminChatHistoryService';
+import { supabase } from './src/services/supabaseService';
 
 const router = express.Router();
 
@@ -38,6 +42,29 @@ router.get('/stats', async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Erro ao buscar estatísticas do dashboard:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Advanced dashboard stats
+router.get('/stats/advanced', async (req, res) => {
+  try {
+    const advancedStats = await getAdvancedDashboardStats();
+    res.json(advancedStats);
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas avançadas do dashboard:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Dashboard metrics with period
+router.get('/metrics', async (req, res) => {
+  try {
+    const { days } = req.query;
+    const metrics = await getDashboardMetrics(days ? parseInt(days as string) : 7);
+    res.json(metrics);
+  } catch (error) {
+    console.error('Erro ao buscar métricas do dashboard:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -280,6 +307,22 @@ router.post('/admin/conversations', async (req, res) => {
   }
 });
 
+// Delete all admin conversations (MUST come before parameterized routes)
+router.delete('/admin/conversations', async (req, res) => {
+  try {
+    const result = await deleteAllAdminConversations();
+    res.json({ 
+      success: true, 
+      message: `${result.deletedConversations} conversas removidas com sucesso`,
+      deletedConversations: result.deletedConversations,
+      deletedMessages: result.deletedMessages
+    });
+  } catch (error) {
+    console.error('Erro ao remover todas as conversas:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 // Get specific conversation details
 router.get('/admin/conversations/:conversationId', async (req, res) => {
   try {
@@ -328,6 +371,118 @@ router.delete('/admin/conversations/:conversationId', async (req, res) => {
     res.json({ success: true, message: 'Conversa removida com sucesso' });
   } catch (error) {
     console.error('Erro ao remover conversa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Test endpoint to generate conversation title with AI
+router.post('/admin/conversations/:conversationId/generate-title', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    
+    // Verificar se a conversa existe
+    const conversation = await getAdminConversation(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversa não encontrada' });
+    }
+    
+    // Buscar histórico da conversa
+    const history = await getAdminChatHistory(conversationId);
+    
+    // Gerar título com IA
+    const { generateConversationTitleWithAI } = await import('./src/services/openaiService');
+    const aiTitle = await generateConversationTitleWithAI(history);
+    
+    // Atualizar o título na base de dados
+    await updateConversationTitle(conversationId, aiTitle);
+    
+    res.json({ 
+      success: true, 
+      message: 'Título gerado com sucesso',
+      oldTitle: conversation.title,
+      newTitle: aiTitle
+    });
+  } catch (error) {
+    console.error('Erro ao gerar título da conversa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Human Support Requests endpoints
+router.get('/human-support-requests', async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = supabase
+      .from('human_support_requests')
+      .select(`
+        *,
+        clients (
+          id,
+          name,
+          phone
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Erro ao buscar solicitações de suporte:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+
+    res.json(data || []);
+  } catch (error) {
+    console.error('Erro ao buscar solicitações de suporte:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+router.get('/human-support-requests/count', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('human_support_requests')
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      console.error('Erro ao contar solicitações de suporte:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+
+    res.json({ count: data?.length || 0 });
+  } catch (error) {
+    console.error('Erro ao contar solicitações de suporte:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+router.put('/human-support-requests/:requestId', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { status, handledBy, notes } = req.body;
+
+    const { error } = await supabase
+      .from('human_support_requests')
+      .update({
+        status,
+        handled_by: handledBy,
+        notes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', requestId);
+
+    if (error) {
+      console.error('Erro ao atualizar solicitação de suporte:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao atualizar solicitação de suporte:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

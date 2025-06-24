@@ -1,5 +1,6 @@
 import { dashboardAPI, type PlanContent } from '../services/api';
 import { useState, useEffect } from 'react';
+import { formatPhoneNumber } from '../utils/phoneFormatter';
 
 interface PlanViewModalProps {
   planId: string;
@@ -137,7 +138,7 @@ const PlanViewModal: React.FC<PlanViewModalProps> = ({ planId, isOpen, onClose }
             </h2>
             {plan && (
               <p className="mt-1 text-sm text-gray-600">
-                Cliente: {plan.client.name} ({plan.client.phone})
+                                        Cliente: {plan.client.name} ({formatPhoneNumber(plan.client.phone)})
               </p>
             )}
           </div>

@@ -3,17 +3,17 @@ import { dashboardAPI } from '../services/api';
 import { realtimeService, type RealtimeMessage } from '../services/supabaseClient';
 
 interface NotificationState {
-  unreadMessages: number;
-  pendingPlans: number;
-  humanSupportRequests: number;
+  unreadMessages: number | undefined;
+  pendingPlans: number | undefined;
+  humanSupportRequests: number | undefined;
   clientUnreadCounts: { [clientId: string]: number };
 }
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<NotificationState>({
-    unreadMessages: 0,
-    pendingPlans: 0,
-    humanSupportRequests: 0,
+    unreadMessages: undefined,
+    pendingPlans: undefined,
+    humanSupportRequests: undefined,
     clientUnreadCounts: {},
   });
 
@@ -39,6 +39,13 @@ export function useNotifications() {
       });
     } catch (error) {
       console.error('Erro ao atualizar notificações:', error);
+      // Em caso de erro, definir como 0 para não mostrar badges falsas
+      setNotifications(prev => ({
+        ...prev,
+        unreadMessages: 0,
+        pendingPlans: 0,
+        humanSupportRequests: 0,
+      }));
     }
   }, []);
 
@@ -50,7 +57,7 @@ export function useNotifications() {
       
       setNotifications(prev => ({
         ...prev,
-        unreadMessages: prev.unreadMessages + 1,
+        unreadMessages: (prev.unreadMessages || 0) + 1,
         clientUnreadCounts: {
           ...prev.clientUnreadCounts,
           [message.client_id]: (prev.clientUnreadCounts[message.client_id] || 0) + 1
@@ -58,8 +65,6 @@ export function useNotifications() {
       }));
     }
   }, []);
-
-
 
   // Inicializar notificações e Realtime
   useEffect(() => {
@@ -70,8 +75,10 @@ export function useNotifications() {
     // Carregar estado inicial
     updateNotifications();
     
-    // Configurar Realtime para todas as mensagens (notificações)
-    realtimeService.subscribeToAllMessages(handleNewMessage);
+    // Aguardar um pouco antes de configurar Realtime para evitar problemas com Strict Mode
+    const realtimeTimeout = setTimeout(() => {
+      realtimeService.subscribeToAllMessages(handleNewMessage);
+    }, 100);
     
     // Backup: polling a cada 30 segundos para garantir sincronização
     const interval = setInterval(updateNotifications, 30000);
@@ -80,8 +87,12 @@ export function useNotifications() {
     
     return () => {
       console.log('🔕 Limpando sistema de notificações');
+      clearTimeout(realtimeTimeout);
       clearInterval(interval);
-      realtimeService.unsubscribe('all_messages');
+      // Aguardar um pouco antes de fazer unsubscribe para evitar erro de WebSocket
+      setTimeout(() => {
+        realtimeService.unsubscribe('all_messages');
+      }, 50);
     };
   }, [updateNotifications, handleNewMessage]);
 
@@ -94,7 +105,7 @@ export function useNotifications() {
       
       return {
         ...prev,
-        unreadMessages: Math.max(0, prev.unreadMessages - decrementAmount),
+        unreadMessages: Math.max(0, (prev.unreadMessages || 0) - decrementAmount),
         clientUnreadCounts: {
           ...prev.clientUnreadCounts,
           [clientId]: newClientCount

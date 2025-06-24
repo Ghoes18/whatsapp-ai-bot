@@ -582,7 +582,7 @@ Se não houve dados suficientes, explica o que seria necessário para obter uma 
       finalResponse.choices[0].message?.content ||
       "Não foi possível gerar uma resposta.";
 
-    // Salvar resposta da IA no histórico
+    // Salvar resposta da IA no histórico (isso também vai gerar o título automaticamente)
     await saveAdminChatMessage(conversationId, {
       role: "assistant",
       content: aiResponse,
@@ -605,5 +605,71 @@ Se não houve dados suficientes, explica o que seria necessário para obter uma 
     }
 
     return errorMessage;
+  }
+}
+
+// Gerar título de conversa usando IA
+export async function generateConversationTitleWithAI(
+  conversationHistory: { role: "user" | "assistant"; content: string }[]
+): Promise<string> {
+  try {
+    // Se não há histórico, retornar título padrão
+    if (conversationHistory.length === 0) {
+      return "Nova Conversa";
+    }
+
+    // Pegar as primeiras mensagens da conversa (máximo 5 para não sobrecarregar)
+    const recentMessages = conversationHistory.slice(0, 5);
+    
+    const systemPrompt = `
+És um assistente especializado em criar títulos curtos e descritivos para conversas. 
+
+REGRAS IMPORTANTES:
+- O título deve ter no máximo 6 palavras
+- Deve ser descritivo e resumir o assunto principal da conversa
+- Use português de Portugal
+- Seja conciso mas informativo
+- Não use pontuação no final
+- Não use aspas
+- Se a conversa for sobre consultas à base de dados, use termos como "Consulta", "Análise", "Estatísticas"
+- Se for sobre clientes, use "Clientes", "Gestão"
+- Se for sobre planos, use "Planos", "Aprovação"
+- Se for sobre mensagens, use "Mensagens", "Comunicação"
+
+Exemplos de bons títulos:
+- "Consulta estatísticas clientes"
+- "Análise planos pendentes"
+- "Gestão mensagens hoje"
+- "Relatório atividade semanal"
+- "Configuração sistema IA"
+
+Responde APENAS com o título, sem aspas, sem pontuação extra, sem explicações.
+`;
+
+    const userPrompt = `
+Histórico da conversa:
+${recentMessages.map((msg, index) => `${msg.role}: ${msg.content}`).join('\n')}
+
+Cria um título curto e descritivo para esta conversa:`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 50,
+      temperature: 0.3, // Baixa temperatura para títulos mais consistentes
+    });
+
+    const title = completion.choices[0].message?.content?.trim() || "Nova Conversa";
+    
+    // Limpar o título de possíveis aspas ou pontuação extra
+    const cleanTitle = title.replace(/^["']|["']$/g, '').replace(/[.!?]+$/, '');
+    
+    return cleanTitle || "Nova Conversa";
+  } catch (error) {
+    console.error("❌ Erro ao gerar título da conversa:", error);
+    return "Nova Conversa";
   }
 }

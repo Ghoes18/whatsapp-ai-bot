@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useNavigate, useLocation, matchPath } from "react-router-dom"
 import { useNotifications } from "../hooks/useNotifications"
+import { useTheme } from "../contexts/ThemeContext"
 import { dashboardAPI } from "../services/api"
 
 // Enhanced SVG Icons
@@ -85,10 +86,33 @@ const ChatIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
+const SunIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+    />
+  </svg>
+)
+
+const MoonIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+    />
+  </svg>
+)
+
 const Sidebar: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { notifications } = useNotifications()
+  const { theme, toggleTheme } = useTheme()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null)
@@ -178,13 +202,13 @@ const Sidebar: React.FC = () => {
       <div className="fixed top-4 left-4 z-50 lg:hidden">
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-3 rounded-xl border border-gray-200 shadow-lg backdrop-blur-sm transition-all duration-200 bg-white/90 hover:shadow-xl hover:bg-white"
+          className="p-3 rounded-xl border border-gray-200 shadow-lg backdrop-blur-sm transition-all duration-200 dark:border-gray-600 bg-white/90 dark:bg-gray-800/90 hover:shadow-xl hover:bg-white dark:hover:bg-gray-800"
           aria-label="Toggle menu"
         >
           {isMobileMenuOpen ? (
-            <XMarkIcon className="w-5 h-5 text-gray-700" />
+            <XMarkIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
           ) : (
-            <Bars3Icon className="w-5 h-5 text-gray-700" />
+            <Bars3Icon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
           )}
         </button>
       </div>
@@ -192,22 +216,37 @@ const Sidebar: React.FC = () => {
       {/* Fixed Sidebar */}
       <div
         className={`
-        fixed inset-y-0 left-0 z-40 w-72 bg-white/95 backdrop-blur-sm shadow-2xl border-r border-gray-200 transform transition-all duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-40 w-72 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm shadow-2xl border-r border-gray-200 dark:border-gray-700 transform transition-all duration-300 ease-in-out
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}
       >
         {/* Enhanced Header */}
-        <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
-          <div className="flex items-center space-x-4">
-            <div className="flex justify-center items-center w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
-              <BotIcon className="w-6 h-6 text-white" />
+        <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <div className="flex justify-center items-center w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                <BotIcon className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300">
+                  AI Bot
+                </h1>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Dashboard</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-700">
-                AI Bot
-              </h1>
-              <p className="text-sm font-medium text-gray-600">Dashboard</p>
-            </div>
+            
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 bg-gray-100 rounded-lg transition-colors duration-200 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <SunIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+              ) : (
+                <MoonIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+              )}
+            </button>
           </div>
         </div>
 
@@ -216,6 +255,7 @@ const Sidebar: React.FC = () => {
           {menuItems.map((item) => {
             const Icon = item.icon
             const active = isActive(item.path)
+            
             return (
               <button
                 key={item.text}
@@ -223,35 +263,45 @@ const Sidebar: React.FC = () => {
                   navigate(item.path)
                   setIsMobileMenuOpen(false)
                 }}
-                className={`
-                  w-full flex items-center space-x-4 px-4 py-3.5 rounded-xl text-left transition-all duration-200 group relative overflow-hidden
+                className={
+                  `w-full flex items-center space-x-4 px-4 py-3.5 rounded-xl text-left transition-all duration-200 group relative overflow-hidden
                   ${
                     active
-                      ? "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      ? "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 shadow-sm"
+                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
                   }
                 `}
               >
                 <div className="relative z-10">
                   <div
                     className={`p-2 rounded-lg transition-all duration-200 ${
-                      active ? `bg-gradient-to-r ${item.gradient} shadow-sm` : "bg-gray-100 group-hover:bg-gray-200"
+                      active ? `bg-gradient-to-r ${item.gradient} shadow-sm` : "bg-gray-100 dark:bg-gray-700 group-hover:bg-gray-200 dark:group-hover:bg-gray-600"
                     }`}
                   >
-                    <Icon className={`h-5 w-5 ${active ? "text-white" : "text-gray-500 group-hover:text-gray-700"}`} />
+                    <Icon className={`h-5 w-5 ${active ? "text-white" : "text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300"}`} />
                   </div>
-                  {item.badge && item.badge > 0 && (
-                    <span className="flex absolute -top-1 -right-1 justify-center items-center w-5 h-5 text-xs font-bold text-white bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-sm">
-                      {item.badge > 99 ? "99+" : item.badge}
-                    </span>
-                  )}
+                  {/* Condição mais rigorosa para evitar qualquer renderização de 0 */}
+                  {(() => {
+                    const badge = item.badge;
+                    const shouldShowBadge = badge !== undefined && 
+                                          badge !== null && 
+                                          typeof badge === 'number' && 
+                                          badge > 0;
+                    
+                    if (!shouldShowBadge) return null;
+                    
+                    return (
+                      <span className="flex absolute -top-1 -right-1 justify-center items-center w-5 h-5 text-xs font-bold text-white bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-sm">
+                        {badge > 99 ? "99+" : badge}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <span
-                  className={`font-medium z-10 ${active ? "text-blue-700" : "text-gray-700 group-hover:text-gray-900"}`}
+                  className={`font-medium z-10 ${active ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100"}`}
                 >
                   {item.text}
                 </span>
-
                 {/* Active indicator */}
                 {active && (
                   <div className="absolute right-0 top-1/2 w-1 h-8 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-l-full transform -translate-y-1/2"></div>
@@ -264,9 +314,9 @@ const Sidebar: React.FC = () => {
         {/* Enhanced AI Toggle */}
         {sidebarClientId && aiEnabled !== null && (
           <div className="px-4 pb-6">
-            <div className="p-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
+            <div className="p-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-semibold text-gray-900">IA do Cliente</span>
+                <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">IA do Cliente</span>
                 <div className={`w-2 h-2 rounded-full ${aiEnabled ? "bg-emerald-500" : "bg-gray-400"}`}></div>
               </div>
               <button
@@ -276,7 +326,7 @@ const Sidebar: React.FC = () => {
                   ${
                     aiEnabled
                       ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white"
-                      : "bg-white border border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+                      : "bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-600"
                   }
                   ${aiLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-md"}
                 `}
@@ -295,10 +345,10 @@ const Sidebar: React.FC = () => {
         )}
 
         {/* Enhanced Footer */}
-        <div className="absolute right-0 bottom-0 left-0 p-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100">
+        <div className="absolute right-0 bottom-0 left-0 p-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
           <div className="text-center">
-            <p className="text-xs font-medium text-gray-500">WhatsApp Bot v2.0</p>
-            <p className="mt-1 text-xs text-gray-400">Powered by AI</p>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">WhatsApp Bot v2.0</p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Powered by AI</p>
           </div>
         </div>
       </div>

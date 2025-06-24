@@ -1,4 +1,5 @@
 import { supabase } from './supabaseService';
+import { generateConversationTitleWithAI } from './openaiService';
 
 type AdminMessage = { role: "user" | "assistant"; content: string };
 
@@ -95,6 +96,21 @@ export async function saveAdminChatMessage(conversationId: string, message: Admi
 
   // Atualizar última interação da conversa
   await updateConversationActivity(conversationId);
+  
+  // Se é a primeira mensagem do assistente, gerar título com IA
+  if (message.role === 'assistant') {
+    // Verificar se é a primeira resposta do assistente (após a primeira do usuário)
+    const history = await getAdminChatHistory(conversationId);
+    const assistantMessages = history.filter(msg => msg.role === 'assistant');
+    
+    // Só gerar título se é a primeira resposta do assistente
+    if (assistantMessages.length === 1) {
+      // Pequeno delay para garantir que a mensagem foi salva
+      setTimeout(async () => {
+        await updateConversationTitleWithAI(conversationId);
+      }, 1000);
+    }
+  }
 }
 
 // Atualizar atividade da conversa
@@ -224,4 +240,80 @@ export async function getAdminConversation(conversationId: string): Promise<Admi
   }
 
   return data;
+}
+
+// Apagar todas as conversas do admin
+export async function deleteAllAdminConversations(): Promise<{ deletedConversations: number; deletedMessages: number }> {
+  // Primeiro, buscar todas as conversas para contar
+  const { data: conversations, error: selectError } = await supabase
+    .from('admin_conversations')
+    .select('id');
+
+  if (selectError) {
+    console.error('Erro ao buscar conversas para apagar:', selectError);
+    throw selectError;
+  }
+
+  const conversationIds = conversations?.map((conv: { id: string }) => conv.id) || [];
+  const conversationCount = conversationIds.length;
+
+  if (conversationCount === 0) {
+    return { deletedConversations: 0, deletedMessages: 0 };
+  }
+
+  // Apagar todas as mensagens
+  const { error: messagesError } = await supabase
+    .from('admin_chat_messages')
+    .delete()
+    .in('session_id', conversationIds);
+
+  if (messagesError) {
+    console.error('Erro ao apagar mensagens:', messagesError);
+    throw messagesError;
+  }
+
+  // Apagar todas as conversas
+  const { error: conversationsError } = await supabase
+    .from('admin_conversations')
+    .delete()
+    .in('id', conversationIds);
+
+  if (conversationsError) {
+    console.error('Erro ao apagar conversas:', conversationsError);
+    throw conversationsError;
+  }
+
+  console.log(`🗑️ Apagadas ${conversationCount} conversas e suas mensagens`);
+  return { deletedConversations: conversationCount, deletedMessages: conversationCount }; // Simplificado, mas poderia contar mensagens se necessário
+}
+
+// Atualizar título da conversa com IA
+export async function updateConversationTitleWithAI(conversationId: string): Promise<void> {
+  try {
+    // Buscar histórico da conversa
+    const history = await getAdminChatHistory(conversationId);
+    
+    // Só gerar título se há pelo menos 2 mensagens (usuário + assistente)
+    if (history.length >= 2) {
+      const aiTitle = await generateConversationTitleWithAI(history);
+      
+      // Atualizar o título na base de dados
+      const { error } = await supabase
+        .from('admin_conversations')
+        .update({ 
+          title: aiTitle,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', conversationId);
+
+      if (error) {
+        console.error('Erro ao atualizar título da conversa com IA:', error);
+      } else {
+        console.log(`🤖 Título gerado com IA: "${aiTitle}" para conversa ${conversationId}`);
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao gerar título com IA:', error);
+    // Não falhar se a geração de título falhar
+  }
 } 

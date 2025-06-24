@@ -6,6 +6,7 @@ import { useParams } from "react-router-dom"
 import { dashboardAPI } from "../services/api"
 import type { Client, ClientStats, Plan } from "../services/api"
 import PlanViewModal from "./PlanViewModal"
+import { formatPhoneNumber } from "../utils/phoneFormatter"
 
 // Enhanced SVG Icons
 const PersonIcon = ({ className }: { className?: string }) => (
@@ -571,7 +572,7 @@ const ClientProfile: React.FC = () => {
                       <WhatsAppIcon className="w-6 h-6 text-green-600" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-900">{client.phone ?? "Telefone não informado"}</p>
+                      <p className="font-semibold text-gray-900">{formatPhoneNumber(client.phone)}</p>
                       <p className="text-sm text-gray-600">WhatsApp</p>
                     </div>
                   </div>

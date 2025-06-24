@@ -7,25 +7,33 @@ import PendingPlans from './components/PendingPlans';
 import HumanSupportRequests from './components/HumanSupportRequests';
 import AdminAIChat from './components/AdminAIChat';
 import Sidebar from './components/Sidebar';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 function App() {
   return (
-    <Router>
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar />
-        <div className="overflow-hidden flex-1">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/conversations" element={<Conversations />} />
-            <Route path="/conversations/:clientId" element={<Conversations />} />
-            <Route path="/client/:clientId" element={<ClientProfile />} />
-            <Route path="/pending-plans" element={<PendingPlans />} />
-            <Route path="/human-support" element={<HumanSupportRequests />} />
-            <Route path="/admin-chat" element={<AdminAIChat />} />
-          </Routes>
+    <ThemeProvider>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}
+      >
+        <div className="flex h-screen bg-gray-50 transition-colors duration-200 dark:bg-gray-900">
+          <Sidebar />
+          <div className="overflow-hidden flex-1">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/conversations" element={<Conversations />} />
+              <Route path="/conversations/:clientId" element={<Conversations />} />
+              <Route path="/client/:clientId" element={<ClientProfile />} />
+              <Route path="/pending-plans" element={<PendingPlans />} />
+              <Route path="/human-support" element={<HumanSupportRequests />} />
+              <Route path="/admin-chat" element={<AdminAIChat />} />
+            </Routes>
+          </div>
         </div>
-      </div>
-    </Router>
+      </Router>
+    </ThemeProvider>
   );
 }
 
