@@ -7,6 +7,7 @@ import { dashboardAPI } from "../services/api"
 import type { Client, ClientStats, Plan } from "../services/api"
 import PlanViewModal from "./PlanViewModal"
 import { formatPhoneNumber } from "../utils/phoneFormatter"
+import { useTheme } from "../contexts/ThemeContext"
 
 // Enhanced SVG Icons
 const PersonIcon = ({ className }: { className?: string }) => (
@@ -82,6 +83,8 @@ const ClientProfile: React.FC = () => {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
 
+  useTheme(); // Garante que o contexto de tema seja ativado
+
   useEffect(() => {
     if (clientId) {
       loadClientData(clientId)
@@ -105,6 +108,13 @@ const ClientProfile: React.FC = () => {
         goal: clientData.goal,
         activity_level: clientData.activity_level,
         dietary_restrictions: clientData.dietary_restrictions,
+        experience: clientData.experience,
+        available_days: clientData.available_days,
+        health_conditions: clientData.health_conditions,
+        exercise_preferences: clientData.exercise_preferences,
+        equipment: clientData.equipment,
+        motivation: clientData.motivation,
+        profile_picture_url: clientData.profile_picture_url,
       })
     } catch (error) {
       console.error("Erro ao carregar dados do cliente:", error)
@@ -159,6 +169,13 @@ const ClientProfile: React.FC = () => {
         goal: client.goal,
         activity_level: client.activity_level,
         dietary_restrictions: client.dietary_restrictions,
+        experience: client.experience,
+        available_days: client.available_days,
+        health_conditions: client.health_conditions,
+        exercise_preferences: client.exercise_preferences,
+        equipment: client.equipment,
+        motivation: client.motivation,
+        profile_picture_url: client.profile_picture_url,
       })
     }
     setIsEditing(false)
@@ -235,7 +252,7 @@ const ClientProfile: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {/* Sidebar space */}
       <div className="hidden w-72 lg:block"></div>
 
@@ -244,10 +261,10 @@ const ClientProfile: React.FC = () => {
           {/* Enhanced Header */}
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-transparent bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text">
+              <h1 className="text-3xl font-bold text-transparent bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text dark:from-gray-100 dark:to-gray-300">
                 Perfil do Cliente
               </h1>
-              <p className="mt-2 text-gray-600">Gerencie as informações e configurações do cliente</p>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">Gerencie as informações e configurações do cliente</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -255,12 +272,12 @@ const ClientProfile: React.FC = () => {
                 className={`px-4 py-2.5 rounded-xl font-medium transition-all duration-200 shadow-sm ${
                   client.ai_enabled
                     ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-emerald-200"
-                    : "bg-white border border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+                    : "bg-white border border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
                 }`}
               >
                 IA {client.ai_enabled ? "Ativada" : "Desativada"}
               </button>
-              <button className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+              <button className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
                 <WhatsAppIcon className="w-4 h-4 mr-2" />
                 Conversar
               </button>
@@ -271,35 +288,35 @@ const ClientProfile: React.FC = () => {
             {/* Enhanced Main Content */}
             <div className="space-y-8 lg:col-span-2">
               {/* Personal Information Card */}
-              <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-                <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+              <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl dark:bg-gray-800 dark:border-gray-700">
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Informações Pessoais</h2>
-                    <p className="mt-1 text-sm text-gray-600">Dados básicos do cliente</p>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Informações Pessoais</h2>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Dados básicos do cliente</p>
                   </div>
                   {!isEditing ? (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="inline-flex items-center px-4 py-2 transition-all duration-200 bg-white border border-gray-300 shadow-sm rounded-xl hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group"
+                      className="inline-flex items-center px-4 py-2 transition-all duration-200 bg-white border border-gray-300 shadow-sm rounded-xl hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
                     >
-                      <EditIcon className="w-4 h-4 mr-2 text-gray-500 group-hover:text-gray-700" />
-                      <span className="font-medium text-gray-700 group-hover:text-gray-900">Editar</span>
+                      <EditIcon className="w-4 h-4 mr-2 text-gray-500 group-hover:text-gray-700 dark:text-gray-300 dark:group-hover:text-gray-100" />
+                      <span className="font-medium text-gray-700 group-hover:text-gray-900 dark:text-gray-100 dark:group-hover:text-white">Editar</span>
                     </button>
                   ) : (
                     <div className="flex space-x-3">
                       <button
                         onClick={handleSave}
-                        className="inline-flex items-center px-4 py-2 font-medium text-white transition-all duration-200 shadow-sm bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded-xl hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                        className="inline-flex items-center px-4 py-2 font-medium text-white transition-all duration-200 shadow-sm bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded-xl hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                       >
                         <SaveIcon className="w-4 h-4 mr-2" />
                         Salvar
                       </button>
                       <button
                         onClick={handleCancel}
-                        className="inline-flex items-center px-4 py-2 transition-all duration-200 bg-white border border-gray-300 shadow-sm rounded-xl hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                        className="inline-flex items-center px-4 py-2 transition-all duration-200 bg-white border border-gray-300 shadow-sm rounded-xl hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
                       >
-                        <CancelIcon className="w-4 h-4 mr-2 text-gray-500" />
-                        <span className="font-medium text-gray-700">Cancelar</span>
+                        <CancelIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-300" />
+                        <span className="font-medium text-gray-700 dark:text-gray-100">Cancelar</span>
                       </button>
                     </div>
                   )}
@@ -308,7 +325,7 @@ const ClientProfile: React.FC = () => {
                 <div className="p-6">
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-2">
-                      <label htmlFor="name" className="block text-sm font-semibold text-gray-900">
+                      <label htmlFor="name" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Nome
                       </label>
                       <input
@@ -319,14 +336,14 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400"
-                            : "border-gray-200 bg-gray-50 text-gray-700"
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="age" className="block text-sm font-semibold text-gray-900">
+                      <label htmlFor="age" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Idade
                       </label>
                       <input
@@ -337,14 +354,14 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400"
-                            : "border-gray-200 bg-gray-50 text-gray-700"
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="gender" className="block text-sm font-semibold text-gray-900">
+                      <label htmlFor="gender" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Gênero
                       </label>
                       <select
@@ -354,8 +371,8 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400"
-                            : "border-gray-200 bg-gray-50 text-gray-700"
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       >
                         <option value="">Selecione</option>
@@ -366,7 +383,7 @@ const ClientProfile: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="height" className="block text-sm font-semibold text-gray-900">
+                      <label htmlFor="height" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Altura (cm)
                       </label>
                       <input
@@ -377,14 +394,14 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400"
-                            : "border-gray-200 bg-gray-50 text-gray-700"
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="weight" className="block text-sm font-semibold text-gray-900">
+                      <label htmlFor="weight" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Peso (kg)
                       </label>
                       <input
@@ -397,14 +414,14 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400"
-                            : "border-gray-200 bg-gray-50 text-gray-700"
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="activity_level" className="block text-sm font-semibold text-gray-900">
+                      <label htmlFor="activity_level" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Nível de Atividade
                       </label>
                       <select
@@ -414,8 +431,8 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400"
-                            : "border-gray-200 bg-gray-50 text-gray-700"
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       >
                         <option value="">Selecione</option>
@@ -428,7 +445,7 @@ const ClientProfile: React.FC = () => {
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <label htmlFor="goal" className="block text-sm font-semibold text-gray-900">
+                      <label htmlFor="goal" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Objetivo
                       </label>
                       <textarea
@@ -439,14 +456,14 @@ const ClientProfile: React.FC = () => {
                         rows={3}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400"
-                            : "border-gray-200 bg-gray-50 text-gray-700"
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <label htmlFor="dietary_restrictions" className="block text-sm font-semibold text-gray-900">
+                      <label htmlFor="dietary_restrictions" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Restrições Alimentares
                       </label>
                       <textarea
@@ -459,10 +476,137 @@ const ClientProfile: React.FC = () => {
                         rows={2}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400"
-                            : "border-gray-200 bg-gray-50 text-gray-700"
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                         placeholder="Ex: Alergia a lactose, vegetariano, etc."
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <label htmlFor="experience" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Experiência
+                      </label>
+                      <textarea
+                        id="experience"
+                        value={isEditing ? (editedClient.experience ?? "") : (client.experience ?? "")}
+                        onChange={(e) => setEditedClient({ ...editedClient, experience: e.target.value })}
+                        disabled={!isEditing}
+                        rows={2}
+                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+                          isEditing
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        }`}
+                        placeholder="Ex: Já treinou antes, iniciante, etc."
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label htmlFor="available_days" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Dias Disponíveis
+                      </label>
+                      <input
+                        id="available_days"
+                        type="text"
+                        value={isEditing ? (editedClient.available_days ?? "") : (client.available_days ?? "")}
+                        onChange={(e) => setEditedClient({ ...editedClient, available_days: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          isEditing
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        }`}
+                        placeholder="Ex: Segunda, Quarta, Sexta"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label htmlFor="health_conditions" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Condições de Saúde
+                      </label>
+                      <textarea
+                        id="health_conditions"
+                        value={isEditing ? (editedClient.health_conditions ?? "") : (client.health_conditions ?? "")}
+                        onChange={(e) => setEditedClient({ ...editedClient, health_conditions: e.target.value })}
+                        disabled={!isEditing}
+                        rows={2}
+                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+                          isEditing
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        }`}
+                        placeholder="Ex: Hipertensão, diabetes, etc."
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label htmlFor="exercise_preferences" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Preferências de Exercício
+                      </label>
+                      <textarea
+                        id="exercise_preferences"
+                        value={isEditing ? (editedClient.exercise_preferences ?? "") : (client.exercise_preferences ?? "")}
+                        onChange={(e) => setEditedClient({ ...editedClient, exercise_preferences: e.target.value })}
+                        disabled={!isEditing}
+                        rows={2}
+                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+                          isEditing
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        }`}
+                        placeholder="Ex: Musculação, corrida, etc."
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label htmlFor="equipment" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Equipamentos
+                      </label>
+                      <input
+                        id="equipment"
+                        type="text"
+                        value={isEditing ? (editedClient.equipment ?? "") : (client.equipment ?? "")}
+                        onChange={(e) => setEditedClient({ ...editedClient, equipment: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          isEditing
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        }`}
+                        placeholder="Ex: Halteres, elástico, etc."
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label htmlFor="motivation" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Motivação
+                      </label>
+                      <textarea
+                        id="motivation"
+                        value={isEditing ? (editedClient.motivation ?? "") : (client.motivation ?? "")}
+                        onChange={(e) => setEditedClient({ ...editedClient, motivation: e.target.value })}
+                        disabled={!isEditing}
+                        rows={2}
+                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+                          isEditing
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        }`}
+                        placeholder="Ex: Emagrecer, ganhar massa, etc."
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label htmlFor="profile_picture_url" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        URL da Foto de Perfil
+                      </label>
+                      <input
+                        id="profile_picture_url"
+                        type="text"
+                        value={isEditing ? (editedClient.profile_picture_url ?? "") : (client.profile_picture_url ?? "")}
+                        onChange={(e) => setEditedClient({ ...editedClient, profile_picture_url: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          isEditing
+                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        }`}
+                        placeholder="Cole aqui a URL da foto de perfil"
                       />
                     </div>
                   </div>

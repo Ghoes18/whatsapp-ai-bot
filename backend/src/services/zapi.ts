@@ -198,3 +198,17 @@ export async function sendButtonWithImage(phone: string, imageUrl: string, capti
     throw error;
   }
 }
+
+// Buscar imagem de perfil do contato
+export async function getContactProfilePicture(phone: string) {
+  try {
+    console.log('🖼️ Buscando foto de perfil para:', phone);
+    const response = await zapi.get(`/profile-picture?phone=${phone}`);
+    console.log('✅ Foto de perfil encontrada');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Erro ao buscar foto de perfil:', error);
+    // Retornar null em caso de erro para usar fallback
+    return null;
+  }
+}

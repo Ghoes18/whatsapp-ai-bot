@@ -33,6 +33,13 @@ export interface Client {
   updated_at: string;
   last_context?: Record<string, unknown>;
   last_message_at?: string;
+  profile_picture_url?: string;
+  experience?: string;
+  available_days?: string;
+  health_conditions?: string;
+  exercise_preferences?: string;
+  equipment?: string;
+  motivation?: string;
 }
 
 export interface Message {
@@ -165,6 +172,10 @@ export const dashboardAPI = {
 
   toggleAI: (clientId: string): Promise<{ ai_enabled: boolean }> =>
     api.post(`/clients/${clientId}/toggle-ai`).then(response => response.data),
+
+  // Imagem de perfil
+  getClientProfilePicture: (clientId: string): Promise<{ link?: string }> =>
+    api.get(`/clients/${clientId}/profile-picture`).then(response => response.data),
 
   // Mensagens
   getMessages: (clientId: string): Promise<Message[]> =>

@@ -12,6 +12,7 @@ import {
   type RealtimeClient,
 } from "../services/supabaseClient";
 import { formatPhoneNumber } from "../utils/phoneFormatter";
+import UserAvatar from "./UserAvatar";
 
 // Enhanced SVG Icons
 const SendIcon = ({ className }: { className?: string }) => (
@@ -597,34 +598,18 @@ const Conversations: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center space-x-4">
-                      <div className="relative">
-                        <div
-                          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
-                            clientId === client.id
-                              ? "bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg"
-                              : "bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 group-hover:from-blue-100 group-hover:to-indigo-100 dark:group-hover:from-blue-800/30 dark:group-hover:to-indigo-800/30"
-                          }`}
-                        >
-                          <PersonIcon
-                            className={`w-6 h-6 ${
-                              clientId === client.id
-                                ? "text-white"
-                                : "text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400"
-                            }`}
-                          />
-                        </div>
-
-                        {/* Badge de mensagens não lidas */}
-                        {notifications.clientUnreadCounts[client.id] > 0 && (
-                          <div className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 bg-red-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm">
-                            <span className="text-xs font-bold text-white px-1">
-                              {notifications.clientUnreadCounts[client.id] > 99 
-                                ? '99+' 
-                                : notifications.clientUnreadCounts[client.id]
-                              }
-                            </span>
-                          </div>
-                        )}
+                                              <div
+                        className={`transition-all duration-200 rounded-full ${
+                          clientId === client.id
+                            ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900"
+                            : ""
+                        }`}
+                      >
+                        <UserAvatar
+                          clientId={client.id}
+                          clientName={client.name}
+                          size="md"
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center mb-1">
@@ -696,11 +681,14 @@ const Conversations: React.FC = () => {
               {/* Enhanced Conversation Header */}
               <div className="p-6 border-b border-gray-100 shadow-sm backdrop-blur-sm dark:border-gray-700 bg-white/90 dark:bg-gray-900/90">
                 <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <div className="flex justify-center items-center w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full shadow-lg">
-                        <PersonIcon className="w-6 h-6 text-white" />
-                      </div>
+                                      <div className="flex items-center space-x-4">
+                      <div className="relative">
+                        <UserAvatar 
+                          clientId={selectedClient.id} 
+                          clientName={selectedClient.name} 
+                          size="md"
+                          className="shadow-lg"
+                        />
 
                     </div>
                     <div>

@@ -53,6 +53,7 @@ CREATE TABLE public.clients (
   exercise_preferences text,
   equipment text,
   motivation text,
+  profile_picture_url text,
   CONSTRAINT clients_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.conversations (

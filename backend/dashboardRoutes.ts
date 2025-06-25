@@ -21,6 +21,7 @@ import {
   getAdvancedDashboardStats,
   getDashboardMetrics
 } from './src/services/dashboardService';
+import { getContactProfilePicture } from './src/services/zapi';
 import { chatWithAdminAI } from './src/services/openaiService';
 import { 
   getAdminChatHistory, 
@@ -156,6 +157,62 @@ router.post('/clients/:clientId/toggle-ai', async (req, res) => {
     res.json({ ai_enabled: newStatus });
   } catch (error) {
     console.error('Erro ao alternar IA:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Get client profile picture from WhatsApp
+router.get('/clients/:clientId/profile-picture', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    
+    // Buscar dados do cliente para obter o telefone
+    const client = await getClientById(clientId);
+    if (!client) {
+      return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+    
+    // Verificar se já temos uma imagem de perfil salva recentemente (cache de 1 hora)
+    const { data: cachedData, error: cacheError } = await supabase
+      .from('clients')
+      .select('profile_picture_url, updated_at')
+      .eq('id', clientId)
+      .single();
+    
+    if (!cacheError && cachedData?.profile_picture_url) {
+      const lastUpdate = new Date(cachedData.updated_at);
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      
+      // Se a imagem foi atualizada há menos de 1 hora, usar cache
+      if (lastUpdate > oneHourAgo) {
+        return res.json({ link: cachedData.profile_picture_url });
+      }
+    }
+    
+    // Buscar nova imagem de perfil da Z-API
+    const profilePictureData = await getContactProfilePicture(client.phone);
+    
+    if (profilePictureData?.link) {
+      // Salvar a nova URL na base de dados
+      const { error: updateError } = await supabase
+        .from('clients')
+        .update({ 
+          profile_picture_url: profilePictureData.link,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', clientId);
+      
+      if (updateError) {
+        console.error('Erro ao salvar URL da imagem de perfil:', updateError);
+      }
+      
+      res.json({ link: profilePictureData.link });
+    } else {
+      // Retornar null se não conseguir buscar a imagem
+      res.json({ link: null });
+    }
+  } catch (error) {
+    console.error('Erro ao buscar imagem de perfil do cliente:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
