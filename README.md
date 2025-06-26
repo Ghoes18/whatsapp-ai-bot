@@ -345,16 +345,9 @@ npm run build
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
-## 🆘 Suporte
+## 👥 Equipa
 
-Para suporte técnico:
-- 📧 Email: suporte@fitai.com
-- 💬 WhatsApp: +351 XXX XXX XXX
-- 📝 Issues: [GitHub Issues](https://github.com/seu-usuario/whatsapp-ai-bot/issues)
-
-## 👥 Equipe
-
-Desenvolvido com ❤️ pela equipe FitAI
+Desenvolvido com ❤️ por [@Ghoes18](https://github.com/Ghoes18)
 
 ---
 
