@@ -8,6 +8,7 @@ import HumanSupportRequests from './components/HumanSupportRequests';
 import AdminAIChat from './components/AdminAIChat';
 import Sidebar from './components/Sidebar';
 import { ThemeProvider } from './contexts/ThemeContext';
+import ClientTable from "./components/ClientTable";
 
 function App() {
   return (
@@ -29,6 +30,8 @@ function App() {
               <Route path="/pending-plans" element={<PendingPlans />} />
               <Route path="/human-support" element={<HumanSupportRequests />} />
               <Route path="/admin-chat" element={<AdminAIChat />} />
+              <Route path="/clients" element={<ClientTable />} />
+              <Route path="/clients/:id" element={<ClientProfile />} />
             </Routes>
           </div>
         </div>

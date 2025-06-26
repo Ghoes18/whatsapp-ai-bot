@@ -8,6 +8,7 @@ import type { Client, ClientStats, Plan } from "../services/api"
 import PlanViewModal from "./PlanViewModal"
 import { formatPhoneNumber } from "../utils/phoneFormatter"
 import { useTheme } from "../contexts/ThemeContext"
+import UserAvatar from "./UserAvatar"
 
 // Enhanced SVG Icons
 const PersonIcon = ({ className }: { className?: string }) => (
@@ -218,11 +219,11 @@ const ClientProfile: React.FC = () => {
         {/* Sidebar space */}
         <div className="hidden w-72 lg:block"></div>
 
-        <div className="flex items-center justify-center flex-1">
+        <div className="flex flex-1 justify-center items-center">
           <div className="text-center">
-            <div className="relative w-16 h-16 mx-auto mb-6">
-              <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-transparent rounded-full border-t-blue-600 animate-spin"></div>
+            <div className="relative mx-auto mb-6 w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin border-t-blue-600"></div>
             </div>
             <h3 className="mb-2 text-lg font-semibold text-gray-900">Carregando perfil</h3>
             <p className="text-gray-600">Buscando informações do cliente...</p>
@@ -238,9 +239,9 @@ const ClientProfile: React.FC = () => {
         {/* Sidebar space */}
         <div className="hidden w-72 lg:block"></div>
 
-        <div className="flex items-center justify-center flex-1">
+        <div className="flex flex-1 justify-center items-center">
           <div className="text-center">
-            <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-200">
+            <div className="flex justify-center items-center mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full">
               <PersonIcon className="w-10 h-10 text-gray-400" />
             </div>
             <h3 className="mb-3 text-xl font-semibold text-gray-900">Cliente não encontrado</h3>
@@ -256,17 +257,17 @@ const ClientProfile: React.FC = () => {
       {/* Sidebar space */}
       <div className="hidden w-72 lg:block"></div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="overflow-auto flex-1">
         <div className="p-6 space-y-8">
           {/* Enhanced Header */}
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-transparent bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text dark:from-gray-100 dark:to-gray-300">
+              <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300">
                 Perfil do Cliente
               </h1>
               <p className="mt-2 text-gray-600 dark:text-gray-400">Gerencie as informações e configurações do cliente</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
               <button
                 onClick={toggleAI}
                 className={`px-4 py-2.5 rounded-xl font-medium transition-all duration-200 shadow-sm ${
@@ -278,7 +279,7 @@ const ClientProfile: React.FC = () => {
                 IA {client.ai_enabled ? "Ativada" : "Desativada"}
               </button>
               <button className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                <WhatsAppIcon className="w-4 h-4 mr-2" />
+                <WhatsAppIcon className="mr-2 w-4 h-4" />
                 Conversar
               </button>
             </div>
@@ -288,8 +289,8 @@ const ClientProfile: React.FC = () => {
             {/* Enhanced Main Content */}
             <div className="space-y-8 lg:col-span-2">
               {/* Personal Information Card */}
-              <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl dark:bg-gray-800 dark:border-gray-700">
-                <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
+              <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                <div className="flex justify-between items-center p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Informações Pessoais</h2>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Dados básicos do cliente</p>
@@ -297,25 +298,25 @@ const ClientProfile: React.FC = () => {
                   {!isEditing ? (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="inline-flex items-center px-4 py-2 transition-all duration-200 bg-white border border-gray-300 shadow-sm rounded-xl hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                      className="inline-flex items-center px-4 py-2 bg-white rounded-xl border border-gray-300 shadow-sm transition-all duration-200 hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
                     >
-                      <EditIcon className="w-4 h-4 mr-2 text-gray-500 group-hover:text-gray-700 dark:text-gray-300 dark:group-hover:text-gray-100" />
+                      <EditIcon className="mr-2 w-4 h-4 text-gray-500 group-hover:text-gray-700 dark:text-gray-300 dark:group-hover:text-gray-100" />
                       <span className="font-medium text-gray-700 group-hover:text-gray-900 dark:text-gray-100 dark:group-hover:text-white">Editar</span>
                     </button>
                   ) : (
                     <div className="flex space-x-3">
                       <button
                         onClick={handleSave}
-                        className="inline-flex items-center px-4 py-2 font-medium text-white transition-all duration-200 shadow-sm bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded-xl hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                        className="inline-flex items-center px-4 py-2 font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl shadow-sm transition-all duration-200 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                       >
-                        <SaveIcon className="w-4 h-4 mr-2" />
+                        <SaveIcon className="mr-2 w-4 h-4" />
                         Salvar
                       </button>
                       <button
                         onClick={handleCancel}
-                        className="inline-flex items-center px-4 py-2 transition-all duration-200 bg-white border border-gray-300 shadow-sm rounded-xl hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                        className="inline-flex items-center px-4 py-2 bg-white rounded-xl border border-gray-300 shadow-sm transition-all duration-200 hover:shadow-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
                       >
-                        <CancelIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-300" />
+                        <CancelIcon className="mr-2 w-4 h-4 text-gray-500 dark:text-gray-300" />
                         <span className="font-medium text-gray-700 dark:text-gray-100">Cancelar</span>
                       </button>
                     </div>
@@ -336,8 +337,8 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
@@ -354,8 +355,8 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
@@ -364,22 +365,29 @@ const ClientProfile: React.FC = () => {
                       <label htmlFor="gender" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Gênero
                       </label>
-                      <select
-                        id="gender"
-                        value={isEditing ? (editedClient.gender ?? "") : (client.gender ?? "")}
-                        onChange={(e) => setEditedClient({ ...editedClient, gender: e.target.value })}
-                        disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                        }`}
-                      >
-                        <option value="">Selecione</option>
-                        <option value="male">Masculino</option>
-                        <option value="female">Feminino</option>
-                        <option value="other">Outro</option>
-                      </select>
+                      {isEditing ? (
+                        <select
+                          id="gender"
+                          value={editedClient.gender ?? ""}
+                          onChange={(e) => setEditedClient({ ...editedClient, gender: e.target.value })}
+                          className="px-4 py-3 w-full bg-white rounded-xl border border-gray-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                        >
+                          <option value="">Selecione</option>
+                          <option value="male">Masculino</option>
+                          <option value="female">Feminino</option>
+                          <option value="other">Outro</option>
+                          <option value="masculino">Masculino</option>
+                          <option value="feminino">Feminino</option>
+                          <option value="outro">Outro</option>
+                        </select>
+                      ) : (
+                        <div className="px-4 py-3 w-full text-gray-700 bg-gray-50 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                          {client.gender === 'male' || client.gender === 'masculino' ? 'Masculino' :
+                           client.gender === 'female' || client.gender === 'feminino' ? 'Feminino' :
+                           client.gender === 'other' || client.gender === 'outro' ? 'Outro' :
+                           client.gender || 'Não informado'}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -394,8 +402,8 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
@@ -414,34 +422,30 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label htmlFor="activity_level" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        Nível de Atividade
+                      <label htmlFor="experience" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Experiência
                       </label>
-                      <select
-                        id="activity_level"
-                        value={isEditing ? (editedClient.activity_level ?? "") : (client.activity_level ?? "")}
-                        onChange={(e) => setEditedClient({ ...editedClient, activity_level: e.target.value })}
-                        disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                        }`}
-                      >
-                        <option value="">Selecione</option>
-                        <option value="sedentary">Sedentário</option>
-                        <option value="lightly_active">Levemente Ativo</option>
-                        <option value="moderately_active">Moderadamente Ativo</option>
-                        <option value="very_active">Muito Ativo</option>
-                        <option value="extremely_active">Extremamente Ativo</option>
-                      </select>
+                      {isEditing ? (
+                        <textarea
+                          id="experience"
+                          value={editedClient.experience ?? ""}
+                          onChange={(e) => setEditedClient({ ...editedClient, experience: e.target.value })}
+                          rows={2}
+                          className="px-4 py-3 w-full bg-white rounded-xl border border-gray-300 transition-all duration-200 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                          placeholder="Ex: Já treinou antes, iniciante, etc."
+                        />
+                      ) : (
+                        <div className="px-4 py-3 w-full text-gray-700 bg-gray-50 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                          {client.experience || 'Não informado'}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
@@ -456,8 +460,8 @@ const ClientProfile: React.FC = () => {
                         rows={3}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                       />
                     </div>
@@ -476,31 +480,13 @@ const ClientProfile: React.FC = () => {
                         rows={2}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                         placeholder="Ex: Alergia a lactose, vegetariano, etc."
                       />
                     </div>
 
-                    <div className="space-y-2 md:col-span-2">
-                      <label htmlFor="experience" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        Experiência
-                      </label>
-                      <textarea
-                        id="experience"
-                        value={isEditing ? (editedClient.experience ?? "") : (client.experience ?? "")}
-                        onChange={(e) => setEditedClient({ ...editedClient, experience: e.target.value })}
-                        disabled={!isEditing}
-                        rows={2}
-                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                          isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                        }`}
-                        placeholder="Ex: Já treinou antes, iniciante, etc."
-                      />
-                    </div>
                     <div className="space-y-2 md:col-span-2">
                       <label htmlFor="available_days" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Dias Disponíveis
@@ -513,8 +499,8 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                         placeholder="Ex: Segunda, Quarta, Sexta"
                       />
@@ -531,8 +517,8 @@ const ClientProfile: React.FC = () => {
                         rows={2}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                         placeholder="Ex: Hipertensão, diabetes, etc."
                       />
@@ -549,8 +535,8 @@ const ClientProfile: React.FC = () => {
                         rows={2}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                         placeholder="Ex: Musculação, corrida, etc."
                       />
@@ -567,8 +553,8 @@ const ClientProfile: React.FC = () => {
                         disabled={!isEditing}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                         placeholder="Ex: Halteres, elástico, etc."
                       />
@@ -585,28 +571,10 @@ const ClientProfile: React.FC = () => {
                         rows={2}
                         className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
                           isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-white border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
+                            : "text-gray-700 bg-gray-50 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         }`}
                         placeholder="Ex: Emagrecer, ganhar massa, etc."
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <label htmlFor="profile_picture_url" className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        URL da Foto de Perfil
-                      </label>
-                      <input
-                        id="profile_picture_url"
-                        type="text"
-                        value={isEditing ? (editedClient.profile_picture_url ?? "") : (client.profile_picture_url ?? "")}
-                        onChange={(e) => setEditedClient({ ...editedClient, profile_picture_url: e.target.value })}
-                        disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          isEditing
-                            ? "border-gray-300 bg-white hover:border-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-gray-500"
-                            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                        }`}
-                        placeholder="Cole aqui a URL da foto de perfil"
                       />
                     </div>
                   </div>
@@ -614,44 +582,44 @@ const ClientProfile: React.FC = () => {
               </div>
 
               {/* Plans History Card */}
-              <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-                <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                  <h2 className="text-xl font-bold text-gray-900">Histórico de Planos</h2>
-                  <p className="mt-1 text-sm text-gray-600">Planos gerados para este cliente</p>
+              <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Histórico de Planos</h2>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Planos gerados para este cliente</p>
                 </div>
                 
                 {loadingPlans ? (
                   <div className="p-12 text-center">
-                    <div className="relative w-16 h-16 mx-auto mb-6">
-                      <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
-                      <div className="absolute inset-0 border-4 border-transparent rounded-full border-t-blue-600 animate-spin"></div>
+                    <div className="relative mx-auto mb-6 w-16 h-16">
+                      <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-600"></div>
+                      <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin border-t-blue-600"></div>
                     </div>
-                    <p className="text-gray-600">Carregando planos...</p>
+                    <p className="text-gray-600 dark:text-gray-400">Carregando planos...</p>
                   </div>
                 ) : plans.length > 0 ? (
                   <div className="p-6 space-y-4">
                     {plans.map((plan) => (
                       <div
                         key={plan.id}
-                        className="p-4 transition-all duration-200 border border-gray-200 rounded-xl hover:shadow-md hover:border-gray-300"
+                        className="p-4 rounded-xl border border-gray-200 transition-all duration-200 hover:shadow-md hover:border-gray-300 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-700"
                       >
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex justify-between items-center mb-3">
                           <div className="flex items-center space-x-3">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100">
-                              <ScheduleIcon className="w-5 h-5 text-blue-600" />
+                            <div className="flex justify-center items-center w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg dark:from-blue-900/30 dark:to-indigo-900/30">
+                              <ScheduleIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                              <h3 className="font-semibold text-gray-900">{plan.type}</h3>
-                              <p className="text-sm text-gray-600">Criado em {formatDate(plan.created_at)}</p>
+                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">{plan.type}</h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Criado em {formatDate(plan.created_at)}</p>
                             </div>
                           </div>
                           <span
                             className={`px-3 py-1 text-xs font-medium rounded-full ${
                               plan.status === 'active'
-                                ? 'bg-green-100 text-green-800'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                                 : plan.status === 'expired'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-gray-100 text-gray-800'
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                             }`}
                           >
                             {plan.status === 'active' ? 'Ativo' : plan.status === 'expired' ? 'Expirado' : 'Concluído'}
@@ -659,8 +627,8 @@ const ClientProfile: React.FC = () => {
                         </div>
                         
                         {plan.expires_at && (
-                          <div className="p-2 mb-3 rounded-lg bg-gray-50">
-                            <p className="text-xs text-gray-600">
+                          <div className="p-2 mb-3 bg-gray-50 rounded-lg dark:bg-gray-700">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
                               Expira em: {formatDate(plan.expires_at)}
                             </p>
                           </div>
@@ -669,9 +637,9 @@ const ClientProfile: React.FC = () => {
                         <div className="flex space-x-2">
                           <button
                             onClick={() => handleViewPlan(plan)}
-                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 transition-all duration-200 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 hover:border-blue-300"
+                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg border border-blue-200 transition-all duration-200 hover:bg-blue-100 hover:border-blue-300 dark:text-blue-300 dark:border-blue-700 dark:bg-blue-900/30 dark:hover:bg-blue-800/30"
                           >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
@@ -683,11 +651,11 @@ const ClientProfile: React.FC = () => {
                   </div>
                 ) : (
                   <div className="p-12 text-center">
-                    <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-200">
-                      <ScheduleIcon className="w-10 h-10 text-gray-400" />
+                    <div className="flex justify-center items-center mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full dark:from-gray-700 dark:to-gray-600">
+                      <ScheduleIcon className="w-10 h-10 text-gray-400 dark:text-gray-500" />
                     </div>
-                    <h3 className="mb-2 text-lg font-medium text-gray-900">Nenhum plano encontrado</h3>
-                    <p className="text-gray-500">Os planos gerados para este cliente aparecerão aqui</p>
+                    <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">Nenhum plano encontrado</h3>
+                    <p className="text-gray-500 dark:text-gray-400">Os planos gerados para este cliente aparecerão aqui</p>
                   </div>
                 )}
               </div>
@@ -696,28 +664,31 @@ const ClientProfile: React.FC = () => {
             {/* Enhanced Sidebar */}
             <div className="space-y-6">
               {/* Contact Information */}
-              <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-                <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                  <h3 className="text-lg font-bold text-gray-900">Informações de Contato</h3>
+              <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Informações de Contato</h3>
                 </div>
                 <div className="p-6 space-y-4">
-                  <div className="flex items-center p-4 space-x-4 bg-gray-50 rounded-xl">
-                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl">
-                      <PersonIcon className="w-6 h-6 text-blue-600" />
-                    </div>
+                  <div className="flex items-center p-4 space-x-4 bg-gray-50 rounded-xl dark:bg-gray-700">
+                    <UserAvatar
+                      clientId={client.id}
+                      clientName={client.name}
+                      size="lg"
+                      className="flex-shrink-0"
+                    />
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-900">{client.name ?? "Nome não informado"}</p>
-                      <p className="text-sm text-gray-600">Cliente</p>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">{client.name ?? "Nome não informado"}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Cliente</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center p-4 space-x-4 bg-gray-50 rounded-xl">
-                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-green-100 to-emerald-100 rounded-xl">
-                      <WhatsAppIcon className="w-6 h-6 text-green-600" />
+                  <div className="flex items-center p-4 space-x-4 bg-gray-50 rounded-xl dark:bg-gray-700">
+                    <div className="flex justify-center items-center w-12 h-12 bg-gradient-to-br from-green-100 to-emerald-100 rounded-xl dark:from-green-900/30 dark:to-emerald-900/30">
+                      <WhatsAppIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-900">{formatPhoneNumber(client.phone)}</p>
-                      <p className="text-sm text-gray-600">WhatsApp</p>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">{formatPhoneNumber(client.phone)}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">WhatsApp</p>
                     </div>
                   </div>
                 </div>
@@ -725,24 +696,24 @@ const ClientProfile: React.FC = () => {
 
               {/* Statistics */}
               {stats && (
-                <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-                  <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                    <h3 className="text-lg font-bold text-gray-900">Estatísticas</h3>
+                <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                  <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Estatísticas</h3>
                   </div>
                   <div className="p-6 space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                      <span className="text-sm font-medium text-gray-700">Total de Mensagens</span>
-                      <span className="text-lg font-bold text-gray-900">{stats.totalMessages ?? 0}</span>
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total de Mensagens</span>
+                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats.totalMessages ?? 0}</span>
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                      <span className="text-sm font-medium text-gray-700">Planos Recebidos</span>
-                      <span className="text-lg font-bold text-gray-900">{stats.plansReceived ?? 0}</span>
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Planos Recebidos</span>
+                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats.plansReceived ?? 0}</span>
                     </div>
-                    <div className="p-3 bg-gray-50 rounded-xl">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-700">Última Atividade</span>
+                    <div className="p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Última Atividade</span>
                       </div>
-                      <span className="text-sm font-semibold text-gray-900">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                         {stats.lastActivity ? formatDate(stats.lastActivity) : "Nunca"}
                       </span>
                     </div>

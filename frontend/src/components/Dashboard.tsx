@@ -120,26 +120,8 @@ const CalendarIcon = ({ className }: { className?: string }) => (
 );
 
 const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalClients: 0,
-    activeConversations: 0,
-    pendingPlans: 0,
-    todayMessages: 0,
-    humanSupportRequests: 0,
-    paidClients: 0,
-    weeklyPlans: 0,
-    conversionRate: 0,
-  });
-
-  const [advancedStats, setAdvancedStats] = useState<AdvancedDashboardStats>({
-    responseRate: 0,
-    avgResponseTime: "0 min",
-    goalDistribution: [],
-    clientGrowth: 0,
-    satisfactionScore: 0,
-    engagementRate: 0,
-  });
-
+  const [stats, setStats] = useState<DashboardStats>();
+  const [advancedStats, setAdvancedStats] = useState<AdvancedDashboardStats>();
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -186,7 +168,7 @@ const Dashboard: React.FC = () => {
   const mainStatCards = [
     {
       title: "Total de Clientes",
-      value: stats.totalClients,
+      value: stats?.totalClients || 0,
       icon: UserGroupIcon,
       gradient: "from-emerald-500 to-teal-600",
       bgGradient: "from-emerald-50 to-teal-50",
@@ -194,7 +176,7 @@ const Dashboard: React.FC = () => {
     },
     {
       title: "Conversas Ativas",
-      value: stats.activeConversations,
+      value: stats?.activeConversations || 0,
       icon: ChatIcon,
       gradient: "from-blue-500 to-indigo-600",
       bgGradient: "from-blue-50 to-indigo-50",
@@ -202,7 +184,7 @@ const Dashboard: React.FC = () => {
     },
     {
       title: "Planos Pendentes",
-      value: stats.pendingPlans,
+      value: stats?.pendingPlans || 0,
       icon: AssignmentIcon,
       gradient: "from-amber-500 to-orange-600",
       bgGradient: "from-amber-50 to-orange-50",
@@ -210,7 +192,7 @@ const Dashboard: React.FC = () => {
     },
     {
       title: "Mensagens Hoje",
-      value: stats.todayMessages,
+      value: stats?.todayMessages || 0,
       icon: TrendingUpIcon,
       gradient: "from-purple-500 to-pink-600",
       bgGradient: "from-purple-50 to-pink-50",
@@ -221,7 +203,7 @@ const Dashboard: React.FC = () => {
   const secondaryStatCards = [
     {
       title: "Suporte Humano",
-      value: stats.humanSupportRequests,
+      value: stats?.humanSupportRequests || 0,
       icon: ExclamationTriangleIcon,
       gradient: "from-red-500 to-pink-600",
       bgGradient: "from-red-50 to-pink-50",
@@ -229,8 +211,8 @@ const Dashboard: React.FC = () => {
     },
     {
       title: "Clientes Pagos",
-      value: stats.paidClients,
-      suffix: ` (${stats.conversionRate}%)`,
+      value: stats?.paidClients || 0,
+      suffix: ` (${stats?.conversionRate?.toFixed(2) || '0.00'}%)`,
       icon: CurrencyDollarIcon,
       gradient: "from-green-500 to-emerald-600",
       bgGradient: "from-green-50 to-emerald-50",
@@ -238,7 +220,7 @@ const Dashboard: React.FC = () => {
     },
     {
       title: "Planos da Semana",
-      value: stats.weeklyPlans,
+      value: stats?.weeklyPlans || 0,
       icon: CalendarIcon,
       gradient: "from-cyan-500 to-blue-600",
       bgGradient: "from-cyan-50 to-blue-50",
@@ -480,63 +462,8 @@ const Dashboard: React.FC = () => {
 
             {/* Enhanced Sidebar */}
             <div className="space-y-6">
-              {/* Performance Metrics */}
-              <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-                <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                    Performance
-                  </h3>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Taxa de Resposta
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        {advancedStats.responseRate}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Tempo Médio
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        {advancedStats.avgResponseTime}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Satisfação
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        {advancedStats.satisfactionScore}/5
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Crescimento (7d)
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                      <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        +{advancedStats.clientGrowth}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Top Goals */}
-              {advancedStats.goalDistribution.length > 0 && (
+              {advancedStats?.goalDistribution && advancedStats.goalDistribution.length > 0 && (
                 <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
                   <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
@@ -546,7 +473,7 @@ const Dashboard: React.FC = () => {
                   <div className="p-6 space-y-3">
                     {advancedStats.goalDistribution.map((goalData, index) => (
                       <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl dark:bg-gray-700">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
+                        <span className="text-sm font-medium text-gray-700 capitalize dark:text-gray-300">
                           {goalData.goal}
                         </span>
                         <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
@@ -557,26 +484,6 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
               )}
-
-              {/* Quick Actions */}
-              <div className="overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-                <div className="p-6 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                    Ações Rápidas
-                  </h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <button className="px-4 py-3 w-full font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-sm transition-all duration-200 hover:from-blue-600 hover:to-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                    Nova Conversa
-                  </button>
-                  <button className="px-4 py-3 w-full font-medium text-gray-700 bg-white rounded-xl border border-gray-300 transition-all duration-200 dark:text-gray-300 dark:bg-gray-700 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-900 dark:hover:text-gray-100 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                    Ver Relatórios
-                  </button>
-                  <button className="px-4 py-3 w-full font-medium text-gray-700 bg-white rounded-xl border border-gray-300 transition-all duration-200 dark:text-gray-300 dark:bg-gray-700 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-900 dark:hover:text-gray-100 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                    Configurações
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>

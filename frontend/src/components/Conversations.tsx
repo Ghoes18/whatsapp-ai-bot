@@ -178,7 +178,7 @@ const UserProfileIcon = ({ className }: { className?: string }) => (
 const Conversations: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const { notifications, updateNotifications, decrementClientUnreadCount } =
+  const { updateNotifications, decrementClientUnreadCount } =
     useNotifications();
 
   const [clients, setClients] = useState<Client[]>([]);

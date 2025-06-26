@@ -168,6 +168,12 @@ const Sidebar: React.FC = () => {
       gradient: "from-emerald-500 to-teal-600",
     },
     {
+      text: "Clientes",
+      icon: UserGroupIcon,
+      path: "/clients",
+      gradient: "from-cyan-500 to-blue-600",
+    },
+    {
       text: "Planos Pendentes",
       icon: ClipboardDocumentListIcon,
       path: "/pending-plans",
