@@ -55,9 +55,13 @@ export interface PendingPlan {
   id: string;
   client_id: string;
   client_phone: string;
+  client_name?: string;
   plan_content: string;
   created_at: string;
   status: 'pending' | 'approved' | 'rejected';
+  has_health_conditions?: boolean;
+  health_conditions?: string;
+  requires_manual_review?: boolean;
 }
 
 export interface Plan {
@@ -134,6 +138,24 @@ export interface AdminConversation {
   created_at: string;
   updated_at: string;
   last_interaction: string;
+}
+
+export interface ClientForManualPlan {
+  id: string;
+  phone: string;
+  name?: string;
+  age?: number;
+  gender?: string;
+  height?: number;
+  weight?: number;
+  goal?: string;
+  experience?: string;
+  available_days?: string;
+  health_conditions?: string;
+  exercise_preferences?: string;
+  dietary_restrictions?: string;
+  equipment?: string;
+  motivation?: string;
 }
 
 // API calls
@@ -230,6 +252,24 @@ export const dashboardAPI = {
 
   createPendingPlan: (clientId: string, planContent: string): Promise<{ planId: string }> =>
     api.post('/pending-plans', { clientId, planContent }).then(response => response.data),
+
+  // 🏥 CRIAR PLANOS MANUAIS (para casos de problemas de saúde)
+  createManualPlan: (clientId: string, planContent: string): Promise<{ planId: string; success: boolean }> =>
+    api.post('/manual-plans', { clientId, planContent }).then(response => response.data),
+
+  // 🏥 ENVIAR PLANOS MANUAIS DIRETAMENTE (novo método)
+  sendManualPlanToClient: (clientId: string, planContent: string): Promise<{ planId: string; success: boolean; message: string }> =>
+    api.post('/send-manual-plan', { clientId, planContent }).then(response => response.data),
+
+  // 💾 SALVAR/CARREGAR PLANOS PENDENTES (atualizar conteúdo)
+  updatePendingPlanContent: (clientId: string, planContent: string): Promise<{ success: boolean; message: string }> =>
+    api.put(`/pending-plans/${clientId}/content`, { planContent }).then(response => response.data),
+
+  getCurrentPendingPlan: (clientId: string): Promise<{ content: string | null }> =>
+    api.get(`/pending-plans/${clientId}/content`).then(response => response.data),
+
+  getClientForManualPlan: (clientId: string): Promise<{ client: ClientForManualPlan }> =>
+    api.get(`/clients/${clientId}/for-manual-plan`).then(response => response.data),
 
   // PDFs dos Planos
   generatePlanPDF: (planId: string): Promise<{ pdfUrl: string }> =>

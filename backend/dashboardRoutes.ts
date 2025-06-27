@@ -19,7 +19,12 @@ import {
   debugListAllPlans,
   markClientMessagesAsRead,
   getAdvancedDashboardStats,
-  getDashboardMetrics
+  getDashboardMetrics,
+  createManualPlan,
+  getClientForManualPlan,
+  sendManualPlanToClient,
+  updatePendingPlanContent,
+  getCurrentPendingPlan
 } from './src/services/dashboardService';
 import { getContactProfilePicture } from './src/services/zapi';
 import { chatWithAdminAI } from './src/services/openaiService';
@@ -287,6 +292,56 @@ router.post('/pending-plans/:planId/review', async (req, res) => {
   }
 });
 
+// Create manual plan for client (used for health condition cases)
+router.post('/manual-plans', async (req, res) => {
+  try {
+    const { clientId, planContent } = req.body;
+    if (!clientId || !planContent) {
+      return res.status(400).json({ error: 'clientId e planContent são obrigatórios' });
+    }
+    
+    const { createManualPlan } = await import('./src/services/dashboardService');
+    const planId = await createManualPlan(clientId, planContent);
+    res.json({ planId, success: true });
+  } catch (error) {
+    console.error('Erro ao criar plano manual:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Send manual plan directly to client (NEW - for immediate sending)
+router.post('/send-manual-plan', async (req, res) => {
+  try {
+    const { clientId, planContent } = req.body;
+    if (!clientId || !planContent) {
+      return res.status(400).json({ error: 'clientId e planContent são obrigatórios' });
+    }
+    
+    const planId = await sendManualPlanToClient(clientId, planContent);
+    res.json({ planId, success: true, message: 'Plano enviado com sucesso para o cliente' });
+  } catch (error) {
+    console.error('Erro ao enviar plano manual:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Get client data for manual plan creation
+router.get('/clients/:clientId/for-manual-plan', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    if (!clientId) {
+      return res.status(400).json({ error: 'clientId é obrigatório' });
+    }
+    
+    const { getClientForManualPlan } = await import('./src/services/dashboardService');
+    const client = await getClientForManualPlan(clientId);
+    res.json({ client });
+  } catch (error) {
+    console.error('Erro ao buscar dados do cliente para plano manual:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 // Create pending plan
 router.post('/pending-plans', async (req, res) => {
   try {
@@ -540,6 +595,39 @@ router.put('/human-support-requests/:requestId', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Erro ao atualizar solicitação de suporte:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Update pending plan content (save as draft)
+router.put('/pending-plans/:clientId/content', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { planContent } = req.body;
+    if (!clientId || !planContent) {
+      return res.status(400).json({ error: 'clientId e planContent são obrigatórios' });
+    }
+    
+    const result = await updatePendingPlanContent(clientId, planContent);
+    res.json(result);
+  } catch (error) {
+    console.error('Erro ao atualizar plano pendente:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Get current pending plan content
+router.get('/pending-plans/:clientId/content', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    if (!clientId) {
+      return res.status(400).json({ error: 'clientId é obrigatório' });
+    }
+    
+    const content = await getCurrentPendingPlan(clientId);
+    res.json({ content });
+  } catch (error) {
+    console.error('Erro ao buscar plano pendente:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

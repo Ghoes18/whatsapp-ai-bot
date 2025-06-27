@@ -51,9 +51,13 @@ export interface PendingPlan {
   id: string;
   client_id: string;
   client_phone: string;
+  client_name?: string;
   plan_content: string;
   created_at: string;
   status: "pending" | "approved" | "rejected";
+  has_health_conditions?: boolean;
+  health_conditions?: string;
+  requires_manual_review?: boolean;
 }
 
 export interface Plan {
@@ -332,22 +336,36 @@ export async function getPendingPlans(): Promise<PendingPlan[]> {
     return [];
   }
 
-  const plansWithClientPhone = await Promise.all(
+  // Importar a função de verificação de condições de saúde
+  const { hasHealthConditions } = await import('./openaiService');
+
+  const plansWithClientInfo = await Promise.all(
     plans.map(async (plan: any) => {
       const { data: client } = await supabase
         .from("clients")
-        .select("phone")
+        .select("phone, name, health_conditions")
         .eq("id", plan.client_id)
         .single();
+      
+      // Verificar se o conteúdo do plano indica revisão manual obrigatória
+      const requiresManualReview = plan.plan_content.includes("⚠️ PLANO REQUER REVISÃO MANUAL ⚠️");
+      
+      // Verificar se o cliente tem problemas de saúde
+      const clientContext = { health_conditions: client?.health_conditions };
+      const hasHealthIssues = await hasHealthConditions(clientContext);
       
       return {
         ...plan,
         client_phone: client?.phone || 'N/A',
+        client_name: client?.name || 'Cliente',
+        has_health_conditions: hasHealthIssues,
+        health_conditions: client?.health_conditions || '',
+        requires_manual_review: requiresManualReview || hasHealthIssues,
       };
     })
   );
 
-  return plansWithClientPhone as PendingPlan[];
+  return plansWithClientInfo as PendingPlan[];
 }
 
 // Helper function to update plan status in database
@@ -451,6 +469,7 @@ async function processApprovedPlan(plan: any): Promise<void> {
       .from("conversations")
       .update({ 
         state: "QUESTIONS",
+        last_interaction: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq("client_id", plan.client_id)
@@ -1249,6 +1268,306 @@ export async function debugListAllPlans(): Promise<any[]> {
   } catch (error) {
     console.error("❌ DEBUG: Erro ao listar planos:", error);
     return [];
+  }
+}
+
+// Criar plano manual para cliente (usado em casos de problemas de saúde)
+export async function createManualPlan(
+  clientId: string, 
+  planContent: string
+): Promise<string> {
+  try {
+    // Verificar se o cliente existe e buscar seus dados
+    const { data: client, error: clientError } = await supabase
+      .from("clients")
+      .select("id, phone, name")
+      .eq("id", clientId)
+      .single();
+
+    if (clientError) {
+      throw clientError;
+    }
+
+    if (!client) {
+      throw new Error("Cliente não encontrado");
+    }
+
+    // Salvar como plano pendente para seguir o fluxo normal de aprovação
+    const { data, error } = await supabase
+      .from("pending_plans")
+      .insert([
+        {
+          client_id: clientId,
+          plan_content: planContent,
+          status: "pending",
+        },
+      ])
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("Erro ao salvar plano manual:", error);
+      throw error;
+    }
+
+    console.log(`✅ Plano manual criado (ID: ${data.id}) para cliente ${client.name}`);
+
+    // ENVIAR MENSAGEM PARA O CLIENTE VIA WHATSAPP
+    try {
+      console.log(`📤 Enviando plano manual para ${client.name} (${client.phone})`);
+      
+      // Preparar mensagem com o plano
+      const message = `🏥 *PLANO PERSONALIZADO CRIADO MANUALMENTE*
+
+Olá ${client.name || 'Cliente'}! 
+
+Criei um plano personalizado especialmente para ti, considerando as tuas condições de saúde e objetivos.
+
+${planContent}
+
+⚠️ *IMPORTANTE:*
+- Este plano foi criado manualmente por um profissional
+- Consulte sempre um médico antes de iniciar qualquer atividade física
+- Monitore sinais de desconforto durante os exercícios
+- Em caso de dúvida, procure acompanhamento profissional
+
+Espero que este plano te ajude a atingir os teus objetivos de forma segura! 💪
+
+Precisas de algum esclarecimento sobre o plano?`;
+
+      // Enviar via WhatsApp
+      await sendWhatsappMessage(client.phone, message);
+      
+      // Salvar a mensagem no histórico de chat
+      await supabase.from("chat_messages").insert([
+        {
+          client_id: clientId,
+          role: "assistant",
+          content: message,
+        },
+      ]);
+
+      console.log(`✅ Plano manual enviado com sucesso para ${client.name}`);
+      
+    } catch (whatsappError) {
+      console.error("❌ Erro ao enviar plano via WhatsApp:", whatsappError);
+      // Não falhar a operação se o WhatsApp falhar, apenas logar o erro
+    }
+
+    return data.id;
+  } catch (error) {
+    console.error("Erro ao criar plano manual:", error);
+    throw error;
+  }
+}
+
+// NOVA FUNÇÃO: Enviar plano manual diretamente ao cliente
+export async function sendManualPlanToClient(
+  clientId: string, 
+  planContent: string
+): Promise<string> {
+  try {
+    // Verificar se o cliente existe e buscar seus dados
+    const { data: client, error: clientError } = await supabase
+      .from("clients")
+      .select("id, phone, name")
+      .eq("id", clientId)
+      .single();
+
+    if (clientError) {
+      throw clientError;
+    }
+
+    if (!client) {
+      throw new Error("Cliente não encontrado");
+    }
+
+    console.log(`📤 Enviando plano manual diretamente para ${client.name} (${client.phone})`);
+    
+    // Preparar mensagem com o plano
+    const message = `🏥 *PLANO PERSONALIZADO CRIADO MANUALMENTE*
+
+Olá ${client.name || 'Cliente'}! 
+
+Criei um plano personalizado especialmente para ti, considerando as tuas condições de saúde e objetivos.
+
+${planContent}
+
+⚠️ *IMPORTANTE:*
+- Este plano foi criado manualmente por um profissional
+- Consulte sempre um médico antes de iniciar qualquer atividade física
+- Monitore sinais de desconforto durante os exercícios
+- Em caso de dúvida, procure acompanhamento profissional
+
+Espero que este plano te ajude a atingir os teus objetivos de forma segura! 💪
+
+Precisas de algum esclarecimento sobre o plano?`;
+
+    // Enviar via WhatsApp
+    await sendWhatsappMessage(client.phone, message);
+    
+    // Salvar como plano aprovado diretamente na tabela plans
+    const { data: planData, error: planError } = await supabase
+      .from("plans")
+      .insert([
+        {
+          client_id: clientId,
+          type: "Manual Health Plan",
+          plan_content: planContent,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select("id")
+      .single();
+
+    if (planError) {
+      console.error("Erro ao salvar plano aprovado:", planError);
+      throw planError;
+    }
+    
+    // Salvar a mensagem no histórico de chat
+    await supabase.from("chat_messages").insert([
+      {
+        client_id: clientId,
+        role: "assistant",
+        content: message,
+      },
+    ]);
+
+    // Remover todos os planos pendentes para este cliente (já que foi resolvido manualmente)
+    const { error: deletePendingError } = await supabase
+      .from("pending_plans")
+      .delete()
+      .eq("client_id", clientId)
+      .eq("status", "pending");
+
+    if (deletePendingError) {
+      console.error("Aviso: Erro ao remover planos pendentes:", deletePendingError);
+      // Não falhar a operação, apenas avisar
+    }
+
+    // Atualizar estado da conversa para QUESTIONS para permitir perguntas sobre o plano
+    const { error: convError } = await supabase
+      .from("conversations")
+      .update({ 
+        state: "QUESTIONS",
+        last_interaction: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("client_id", clientId);
+
+    if (convError) {
+      console.error("Erro ao atualizar estado da conversa:", convError);
+    } else {
+      console.log("✅ Estado da conversa atualizado para QUESTIONS");
+    }
+
+    console.log(`✅ Plano manual enviado e salvo como aprovado para ${client.name}`);
+    
+    return planData.id;
+  } catch (error) {
+    console.error("Erro ao enviar plano manual:", error);
+    throw error;
+  }
+}
+
+// Buscar dados completos do cliente para criação de plano manual
+export async function getClientForManualPlan(clientId: string): Promise<any> {
+  try {
+    const { data: client, error } = await supabase
+      .from("clients")
+      .select(`
+        id, 
+        phone, 
+        name, 
+        age, 
+        gender, 
+        height, 
+        weight, 
+        goal, 
+        experience, 
+        available_days, 
+        health_conditions, 
+        exercise_preferences, 
+        dietary_restrictions, 
+        equipment, 
+        motivation
+      `)
+      .eq("id", clientId)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!client) {
+      throw new Error("Cliente não encontrado");
+    }
+
+    return client;
+  } catch (error) {
+    console.error("Erro ao buscar dados do cliente:", error);
+    throw error;
+  }
+}
+
+// Atualizar conteúdo do plano pendente (para salvamento temporário)
+export async function updatePendingPlanContent(
+  clientId: string, 
+  planContent: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // Buscar plano pendente existente para este cliente
+    const { data: existingPlan, error: findError } = await supabase
+      .from("pending_plans")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("status", "pending")
+      .single();
+
+    if (findError || !existingPlan) {
+      return { success: false, message: "Plano pendente não encontrado" };
+    }
+
+    // Atualizar o conteúdo do plano pendente
+    const { error: updateError } = await supabase
+      .from("pending_plans")
+      .update({
+        plan_content: planContent
+      })
+      .eq("id", existingPlan.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    console.log(`✅ Conteúdo do plano pendente atualizado para cliente ${clientId}`);
+    return { success: true, message: "Plano salvo como rascunho" };
+  } catch (error) {
+    console.error("Erro ao atualizar plano pendente:", error);
+    return { success: false, message: "Erro ao salvar rascunho" };
+  }
+}
+
+// Buscar plano pendente atual para um cliente
+export async function getCurrentPendingPlan(clientId: string): Promise<string | null> {
+  try {
+    const { data: plan, error } = await supabase
+      .from("pending_plans")
+      .select("plan_content")
+      .eq("client_id", clientId)
+      .eq("status", "pending")
+      .single();
+
+    if (error) {
+      console.log("Nenhum plano pendente encontrado para o cliente");
+      return null;
+    }
+
+    return plan?.plan_content || null;
+  } catch (error) {
+    console.error("Erro ao buscar plano pendente:", error);
+    return null;
   }
 }
 

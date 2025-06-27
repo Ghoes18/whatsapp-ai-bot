@@ -39,9 +39,179 @@ type Message = { role: "system" | "user" | "assistant"; content: string };
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Função para verificar se cliente tem problemas de saúde usando IA
+export async function hasHealthConditions(context: ClientContext): Promise<boolean> {
+  console.log('🔍 DEBUG hasHealthConditions - Contexto recebido:', JSON.stringify(context, null, 2));
+  
+  if (!context.health_conditions) {
+    console.log('❌ DEBUG: health_conditions está vazio ou undefined');
+    return false;
+  }
+  
+  const healthConditions = context.health_conditions.toLowerCase().trim();
+  console.log('🔍 DEBUG: health_conditions processado:', healthConditions);
+  
+  // Se a resposta for claramente "nenhuma condição", retornar false imediatamente
+  const clearNoConditions = [
+    "nenhuma",
+    "nenhum", 
+    "não",
+    "nao",
+    "sem problemas",
+    "sem condicoes",
+    "sem condições",
+    "saudável",
+    "saudavel",
+    "normal",
+    "ok",
+    "tudo bem",
+    "tudo ok",
+    "não tenho",
+    "nao tenho",
+    "não há",
+    "nao ha",
+    "sem nada",
+    "nada",
+    "n/a",
+    "zero",
+    "0",
+    ""
+  ];
+  
+  // Verificar se é claramente "nenhuma condição"
+  const isClearlyNoCondition = clearNoConditions.some(indicator => {
+    if (indicator === "") return healthConditions === "";
+    const regex = new RegExp(`\\b${indicator}\\b`, 'i');
+    return regex.test(healthConditions) || healthConditions === indicator;
+  });
+  
+  if (isClearlyNoCondition) {
+    console.log('✅ DEBUG: Cliente claramente confirmou não ter condições de saúde');
+    return false;
+  }
+  
+  // Usar IA para interpretar se há problemas de saúde
+  console.log('🤖 DEBUG: Usando IA para interpretar condições de saúde...');
+  
+  try {
+    const systemPrompt = `
+És um especialista médico em análise de condições de saúde para fitness. A tua tarefa é determinar se uma pessoa tem condições de saúde que requerem atenção especial antes de criar um plano de treino.
+
+Responde APENAS com um objeto JSON no seguinte formato:
+{
+  "has_health_conditions": true/false,
+  "reason": "breve explicação da decisão"
+}
+
+Regras para determinar se tem condições de saúde:
+
+SIM (has_health_conditions: true) - se a pessoa mencionar:
+- Doenças crónicas (diabetes, hipertensão, problemas cardíacos, etc.)
+- Lesões ou problemas ortopédicos (lesões no joelho, costas, ombros, etc.)
+- Condições médicas que afetam o exercício
+- Medicação que pode interferir com treino
+- Problemas de saúde que requerem precauções
+- Qualquer condição que um personal trainer deveria saber
+
+NÃO (has_health_conditions: false) - se a pessoa disser:
+- Que não tem problemas de saúde
+- Que está saudável
+- Que não tem condições especiais
+- Respostas vagas ou ambíguas que não indicam problemas específicos
+
+IMPORTANTE: Sê conservador. Se houver qualquer dúvida sobre condições de saúde, responde com has_health_conditions: true para garantir segurança.
+
+Responde sempre em formato JSON válido.
+`;
+
+    const userPrompt = `Analisa esta resposta sobre condições de saúde: "${healthConditions}"
+
+Esta pessoa tem condições de saúde que requerem atenção especial para criar um plano de treino?`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 100,
+      temperature: 0.1, // Baixa temperatura para respostas mais consistentes
+      response_format: { type: "json_object" },
+    });
+
+    const responseContent = completion.choices[0].message?.content?.trim();
+    console.log(`🤖 DEBUG: Resposta da IA: "${responseContent}"`);
+    
+    let result = false;
+    try {
+      const jsonResponse = JSON.parse(responseContent || '{}');
+      result = jsonResponse.has_health_conditions === true;
+      console.log(`🔍 DEBUG: JSON parseado - has_health_conditions: ${jsonResponse.has_health_conditions}, reason: ${jsonResponse.reason}`);
+    } catch (parseError) {
+      console.error('❌ Erro ao fazer parse da resposta JSON:', parseError);
+      // Fallback: se não conseguir fazer parse, assumir que tem problemas
+      result = true;
+    }
+    
+    console.log(`🔍 DEBUG: Resultado final hasHealthConditions: ${result}`);
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Erro ao usar IA para interpretar condições de saúde:', error);
+    
+    // Fallback: se a IA falhar, usar lógica conservadora
+    console.log('⚠️ DEBUG: Usando fallback conservador - assumindo que tem problemas de saúde');
+    return healthConditions.length > 0; // Se escreveu algo, assumir que pode ter problemas
+  }
+}
+
 export async function generateTrainingAndNutritionPlan(
   context: ClientContext
 ): Promise<string> {
+  console.log('🔍 DEBUG generateTrainingAndNutritionPlan - Contexto recebido:', JSON.stringify(context, null, 2));
+  
+  // NOVA REGRA: Se cliente tem problemas de saúde, não gerar plano por IA
+  const hasHealthIssues = await hasHealthConditions(context);
+  console.log(`🔍 DEBUG generateTrainingAndNutritionPlan - hasHealthIssues: ${hasHealthIssues}`);
+  
+  if (hasHealthIssues) {
+    console.log(`🚨 Cliente ${context.name} tem problemas de saúde: ${context.health_conditions}`);
+    console.log('❌ Plano NÃO pode ser gerado por IA - Requer revisão manual');
+    
+    // Retornar mensagem especial indicando que requer revisão manual
+    const manualReviewMessage = `⚠️ PLANO REQUER REVISÃO MANUAL ⚠️
+
+MOTIVO: Cliente reportou condições de saúde que requerem avaliação profissional.
+
+DADOS DO CLIENTE:
+Nome: ${context.name}
+Idade: ${context.age} anos
+Género: ${context.gender}
+Altura: ${context.height} cm
+Peso: ${context.weight} kg
+Objetivo: ${context.goal}
+Experiência: ${context.experience || "Não especificada"}
+Dias disponíveis: ${context.available_days || "Não especificados"}
+⚠️ CONDIÇÕES DE SAÚDE: ${context.health_conditions}
+Preferências de exercício: ${context.exercise_preferences || "Não especificadas"}
+Restrições alimentares: ${context.dietary_restrictions || "Nenhuma"}
+Equipamento disponível: ${context.equipment || "Não especificado"}
+Motivação: ${context.motivation || "Não especificada"}
+
+🔍 AÇÃO REQUERIDA:
+- Avaliar as condições de saúde reportadas
+- Consultar profissional de saúde se necessário
+- Criar plano personalizado considerando as limitações médicas
+- Incluir avisos específicos e precauções apropriadas
+
+⚠️ IMPORTANTE: Este plano deve ser criado manualmente por um profissional qualificado devido às condições de saúde reportadas pelo cliente.`;
+    
+    console.log('🔍 DEBUG: Retornando mensagem de revisão manual');
+    return manualReviewMessage;
+  }
+
+  console.log('✅ DEBUG: Cliente sem problemas de saúde, gerando plano normal por IA');
+
   const systemPrompt = `
 És um coach PhD em treino e nutrição, altamente qualificado e profissional. O teu papel é criar planos detalhados e personalizados de treino e dieta, adaptados às características e objetivos do cliente. Sê motivacional, claro e organizado na resposta, usando sempre o Português de Portugal.
 `;

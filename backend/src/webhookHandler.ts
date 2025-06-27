@@ -480,12 +480,25 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
 async function handleWaitingForPayment(from: string, text: string, conversation: any) {
   // Simples detecção de confirmação de pagamento | ALERTA: APENAS PARA TESTES DEPOIS APLICAR A API DO IFTHENPAY
   if (/pag(uei|amento)|comprovativo|pago|feito|transfer/i.test(text)) {
+    // Atualizar estado para PAID
     await supabase
       .from("conversations")
-      .update({ state: STATES.PAID })
+      .update({ 
+        state: STATES.PAID,
+        last_interaction: new Date().toISOString()
+      })
       .eq("id", conversation?.id);
+      
     await sendMessageAndSave(from, conversation.client_id, "Pagamento confirmado! Em instantes você receberá seu plano personalizado.");
-    await handlePaidState(from, conversation); // Avança para o próximo estado
+    
+    // Buscar a conversa atualizada para ter o estado correto
+    const { data: updatedConversation } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("id", conversation.id)
+      .single();
+      
+    await handlePaidState(from, updatedConversation || conversation); // Avança para o próximo estado
     return;
   }
   await sendMessageAndSave(from, conversation.client_id, "Para finalizar, envie o comprovativo do pagamento Mbway para este número ou clique no link: [LINK_DO_MBWAY]");
@@ -495,15 +508,58 @@ async function handleWaitingForPayment(from: string, text: string, conversation:
 async function handlePaidState(from: string, conversation: any) {
   try {
     const context = conversation?.context;
+    console.log('🔍 DEBUG handlePaidState - Contexto da conversa:', JSON.stringify(context, null, 2));
+    
     if (!context) {
       await sendMessageAndSave(from, conversation.client_id, 'Não foi possível encontrar seus dados para gerar o plano.');
       return;
     }
 
+    // Importar a função de verificação de condições de saúde
+    const { hasHealthConditions, generateTrainingAndNutritionPlan } = await import('./services/openaiService');
+    
+    // Verificar se cliente tem problemas de saúde
+    console.log('🔍 DEBUG: Chamando hasHealthConditions...');
+    const hasHealthIssues = await hasHealthConditions(context);
+    console.log(`🔍 DEBUG: Resultado hasHealthIssues: ${hasHealthIssues}`);
+    
+    if (hasHealthIssues) {
+      console.log(`🚨 Cliente ${context.name} tem problemas de saúde: ${context.health_conditions}`);
+      console.log('⚠️ Plano será criado manualmente devido a condições de saúde');
+      
+      // Gerar "plano" especial para revisão manual
+      const manualReviewPlan = await generateTrainingAndNutritionPlan(context);
+      
+      // Salvar como plano pendente para revisão manual obrigatória
+      const { savePendingPlan } = await import('./services/dashboardService');
+      const planId = await savePendingPlan(conversation.client_id, manualReviewPlan);
+      
+      console.log(`✅ Plano para revisão manual salvo (ID: ${planId})`);
+
+      // Atualizar estado da conversa para aguardar aprovação do plano
+      await supabase
+        .from('conversations')
+        .update({ 
+          state: STATES.WAITING_FOR_PAYMENT, // Manter em pagamento até o plano ser aprovado
+          context: { ...context, pendingPlanId: planId, requiresManualReview: true }
+        })
+        .eq('id', conversation.id);
+
+      // Mensagens específicas para clientes com problemas de saúde
+      await sendMessageAndSave(from, conversation.client_id, '✅ Pagamento confirmado! Obrigado pela sua confiança.');
+      await sendMessageAndSave(from, conversation.client_id, '🏥 Detetámos que tem condições de saúde que requerem atenção especial.');
+      await sendMessageAndSave(from, conversation.client_id, '👨‍⚕️ Por questões de segurança, o seu plano será criado manualmente por um profissional qualificado.');
+      await sendMessageAndSave(from, conversation.client_id, '📋 Este processo assegura que todas as suas condições de saúde são devidamente consideradas.');
+      await sendMessageAndSave(from, conversation.client_id, '⏰ O seu plano personalizado estará pronto em 24-48 horas e será revisto por um especialista.');
+      
+    } else {
+      // Fluxo normal para clientes sem problemas de saúde
+      console.log(`✅ Cliente ${context.name} sem problemas de saúde - Gerando plano por IA`);
+
     // Gerar plano com OpenAI
     const plano = await generateTrainingAndNutritionPlan(context);
 
-    // MUDANÇA: Salvar plano como PENDENTE para revisão em vez de enviar diretamente
+      // Salvar plano como PENDENTE para revisão em vez de enviar diretamente
     console.log('📋 Salvando plano como pendente...');
     
     // Importar a função savePendingPlan
@@ -523,10 +579,11 @@ async function handlePaidState(from: string, conversation: any) {
       })
       .eq('id', conversation.id);
 
-    // Notificar o cliente que o plano está sendo preparado
+      // Notificar o cliente que o plano está sendo preparado (mensagens padrão)
     await sendMessageAndSave(from, conversation.client_id, '✅ Pagamento confirmado! Estamos a preparar o seu plano personalizado.');
     await sendMessageAndSave(from, conversation.client_id, '📋 O seu plano será revisto pela nossa equipa e enviado em breve.');
     await sendMessageAndSave(from, conversation.client_id, '⏰ Normalmente este processo demora 24-48 horas.');
+    }
 
   } catch (error) {
     console.log("❌ Erro no estado PAID:", error);
@@ -589,8 +646,6 @@ async function handleQuestionsState(from: string, text: string, conversation: an
     await sendMessageAndSave(from, conversation.client_id, 'Ocorreu um erro ao responder sua dúvida. Tente novamente mais tarde.');
   }
 }
-
-
 
 // Funções auxiliares para botões (versão elegante)
 async function sendGenderQuestion(from: string, clientId: string) {
@@ -681,4 +736,31 @@ function mapButtonIdToValue(questionType: string, buttonId: string): string {
   };
   
   return mappings[questionType]?.[buttonId] || buttonId;
+}
+
+// Nova função para transicionar conversa para estado QUESTIONS (chamada quando plano é aprovado)
+export async function transitionToQuestionsState(clientId: string, approvedPlanContent: string) {
+  try {
+    console.log(`🔄 Transicionando cliente ${clientId} para estado QUESTIONS`);
+    
+    // Atualizar estado da conversa para QUESTIONS
+    const { error: updateError } = await supabase
+      .from('conversations')
+      .update({ 
+        state: STATES.QUESTIONS,
+        last_interaction: new Date().toISOString()
+      })
+      .eq('client_id', clientId);
+
+    if (updateError) {
+      console.error('❌ Erro ao atualizar estado da conversa:', updateError);
+      return false;
+    }
+
+    console.log(`✅ Cliente ${clientId} transicionado para estado QUESTIONS`);
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao transicionar para estado QUESTIONS:', error);
+    return false;
+  }
 }

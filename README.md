@@ -10,12 +10,41 @@ O **FitAI WhatsApp Bot** é uma solução completa para profissionais de fitness
 
 - 🎯 **Coleta Inteligente de Dados**: Questionário interativo via WhatsApp com botões e formulários
 - 🧠 **Geração de Planos com IA**: Planos personalizados usando OpenAI GPT-4
+- 🏥 **⚠️ NOVO: Proteção para Clientes com Problemas de Saúde**: Planos não são gerados automaticamente por IA se o cliente reportar condições de saúde
 - 💳 **Processamento de Pagamentos**: Integração com MBway (implementável)
 - 📊 **Dashboard Administrativo**: Interface completa para gestão de clientes e conversas
 - 💬 **Chat IA Administrativo**: Análise de dados e consultas via IA
 - 🌙 **Modo Escuro**: Interface moderna com suporte a dark mode
 - 📱 **Responsivo**: Funciona perfeitamente em desktop e mobile
 - 🔄 **Suporte Humano**: Sistema de escalação para atendimento manual
+
+## 🏥 **NOVA FUNCIONALIDADE: Proteção de Clientes com Problemas de Saúde**
+
+### 🎯 **Como Funciona**
+Por questões de segurança e responsabilidade profissional, o sistema agora:
+
+1. **Detecta automaticamente** quando um cliente reporta problemas de saúde
+2. **Impede a geração automática** de planos por IA para estes casos
+3. **Encaminha para revisão manual obrigatória** por um profissional qualificado
+4. **Envia mensagens específicas** explicando o processo diferenciado
+
+### 🔍 **Detecção Inteligente**
+O sistema reconhece quando o cliente **NÃO** tem problemas:
+- "nenhuma", "nenhum", "não", "sem problemas", "saudável", "normal", "ok", etc.
+
+E quando **TEM** problemas de saúde:
+- "hipertensão", "diabetes", "lesão", "dor", "cirurgia", "medicação", etc.
+
+### 💬 **Mensagens Diferenciadas**
+Para clientes com problemas de saúde, o sistema envia:
+- 🏥 "Detetámos que tem condições de saúde que requerem atenção especial"
+- 👨‍⚕️ "Por questões de segurança, o seu plano será criado manualmente por um profissional qualificado"
+- 📋 "Este processo assegura que todas as suas condições de saúde são devidamente consideradas"
+
+### 📊 **Dashboard Melhorado**
+- ⚠️ **Badge vermelho** "Revisão Manual" para planos com problemas de saúde
+- 🏥 **Alerta destacado** mostrando as condições de saúde reportadas
+- 👨‍⚕️ **Priorização visual** para facilitar identificação pelos administradores
 
 ## 🏗️ Arquitetura do Sistema
 
