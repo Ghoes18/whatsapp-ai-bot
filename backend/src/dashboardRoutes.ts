@@ -25,9 +25,9 @@ import {
   sendManualPlanToClient,
   updatePendingPlanContent,
   getCurrentPendingPlan
-} from './src/services/dashboardService';
-import { getContactProfilePicture } from './src/services/zapi';
-import { chatWithAdminAI } from './src/services/openaiService';
+} from './services/dashboardService';
+import { getContactProfilePicture } from './services/zapi';
+import { chatWithAdminAI } from './services/openaiService';
 import { 
   getAdminChatHistory, 
   getAdminConversations,
@@ -36,8 +36,8 @@ import {
   getAdminConversation,
   updateConversationTitle,
   deleteAllAdminConversations
-} from './src/services/adminChatHistoryService';
-import { supabase } from './src/services/supabaseService';
+} from './services/adminChatHistoryService';
+import { supabase } from './services/supabaseService';
 
 const router = express.Router();
 
@@ -300,7 +300,7 @@ router.post('/manual-plans', async (req, res) => {
       return res.status(400).json({ error: 'clientId e planContent são obrigatórios' });
     }
     
-    const { createManualPlan } = await import('./src/services/dashboardService');
+    const { createManualPlan } = await import('./services/dashboardService');
     const planId = await createManualPlan(clientId, planContent);
     res.json({ planId, success: true });
   } catch (error) {
@@ -333,7 +333,7 @@ router.get('/clients/:clientId/for-manual-plan', async (req, res) => {
       return res.status(400).json({ error: 'clientId é obrigatório' });
     }
     
-    const { getClientForManualPlan } = await import('./src/services/dashboardService');
+    const { getClientForManualPlan } = await import('./services/dashboardService');
     const client = await getClientForManualPlan(clientId);
     res.json({ client });
   } catch (error) {
@@ -502,7 +502,7 @@ router.post('/admin/conversations/:conversationId/generate-title', async (req, r
     const history = await getAdminChatHistory(conversationId);
     
     // Gerar título com IA
-    const { generateConversationTitleWithAI } = await import('./src/services/openaiService');
+    const { generateConversationTitleWithAI } = await import('./services/openaiService');
     const aiTitle = await generateConversationTitleWithAI(history);
     
     // Atualizar o título na base de dados
