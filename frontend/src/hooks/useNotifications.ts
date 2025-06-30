@@ -53,7 +53,7 @@ export function useNotifications() {
   const handleNewMessage = useCallback((message: RealtimeMessage) => {
     // Só contar se a mensagem for do usuário (não do assistente) e não estiver lida
     if (message.role === 'user' && !message.read) {
-      console.log('📬 Nova mensagem não lida detectada via Realtime:', message);
+      
       
       setNotifications(prev => ({
         ...prev,
@@ -70,7 +70,7 @@ export function useNotifications() {
   useEffect(() => {
     if (isInitializedRef.current) return;
     
-    console.log('🔔 Inicializando sistema de notificações com Realtime');
+
     
     // Carregar estado inicial
     updateNotifications();
@@ -86,7 +86,7 @@ export function useNotifications() {
     isInitializedRef.current = true;
     
     return () => {
-      console.log('🔕 Limpando sistema de notificações');
+  
       clearTimeout(realtimeTimeout);
       clearInterval(interval);
       // Aguardar um pouco antes de fazer unsubscribe para evitar erro de WebSocket

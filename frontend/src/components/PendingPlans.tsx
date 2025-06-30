@@ -172,15 +172,12 @@ const PendingPlans: React.FC = () => {
       try {
         const planResponse = await dashboardAPI.getCurrentPendingPlan(plan.client_id)
         if (planResponse.content) {
-          console.log('📄 Conteúdo do plano pendente carregado')
           setManualPlanContent(planResponse.content)
         } else {
           // Usar o conteúdo original do plano se não encontrar conteúdo atualizado
-          console.log('📄 Usando conteúdo original do plano')
           setManualPlanContent(plan.plan_content)
         }
-      } catch (error) {
-        console.log('⚠️ Erro ao carregar plano pendente, usando conteúdo original:', error)
+      } catch {
         // Fallback: usar o conteúdo original do plano
         setManualPlanContent(plan.plan_content)
       }
@@ -200,20 +197,16 @@ const PendingPlans: React.FC = () => {
     }
 
     try {
-      console.log('💾 Salvando alterações no plano pendente...')
-      
       const response = await dashboardAPI.updatePendingPlanContent(selectedClientForManual.id, manualPlanContent)
       
       if (response.success) {
         setIsPlanSaved(true)
-        console.log('✅ Plano atualizado:', response.message)
         
         // Mostrar feedback visual temporário
         setTimeout(() => {
           setIsPlanSaved(false)
         }, 3000)
       } else {
-        console.error('❌ Erro ao salvar:', response.message)
         alert('❌ Erro ao salvar: ' + response.message)
       }
       
@@ -232,10 +225,6 @@ const PendingPlans: React.FC = () => {
       
       // Enviar plano manual diretamente para o cliente via WhatsApp
       const response = await dashboardAPI.sendManualPlanToClient(selectedClientForManual.id, manualPlanContent)
-      
-      // Mostrar feedback de sucesso
-      console.log('✅ Plano manual enviado com sucesso!')
-      console.log('Response:', response)
       
       // Fechar modal e limpar estados
       setIsCreateManualModalOpen(false)

@@ -160,12 +160,7 @@ export async function sendMessageToClient(
   clientId: string,
   content: string
 ): Promise<void> {
-  console.log('=== sendMessageToClient ===');
-  console.log('clientId:', clientId);
-  console.log('content:', content);
-  
   // Primeiro, buscar o número do cliente
-  console.log('Buscando dados do cliente...');
   const { data: client, error: clientError } = await supabase
     .from("clients")
     .select("phone")
@@ -181,11 +176,8 @@ export async function sendMessageToClient(
     console.error("Número do cliente não encontrado, client data:", client);
     throw new Error("Número do cliente não encontrado");
   }
-  
-  console.log('Cliente encontrado:', client);
 
   // Salvar a mensagem no histórico
-  console.log('Salvando mensagem no histórico...');
   const { error: messageError } = await supabase.from("chat_messages").insert([
     {
       client_id: clientId,
@@ -198,11 +190,8 @@ export async function sendMessageToClient(
     console.error("Erro ao salvar mensagem:", messageError);
     throw messageError;
   }
-  
-  console.log('Mensagem salva no histórico com sucesso');
 
   // Atualizar last_message_at do cliente para Realtime
-  console.log('Atualizando last_message_at do cliente...');
   const { error: updateError } = await supabase
     .from("clients")
     .update({ 
@@ -214,15 +203,11 @@ export async function sendMessageToClient(
   if (updateError) {
     console.error("Erro ao atualizar last_message_at:", updateError);
     // Não interromper o fluxo se esta atualização falhar
-  } else {
-    console.log('last_message_at atualizado com sucesso');
   }
 
   // Enviar mensagem via WhatsApp
   try {
-    console.log('Enviando mensagem via WhatsApp para:', client.phone);
     await sendWhatsappMessage(client.phone, content);
-    console.log('Mensagem enviada via WhatsApp com sucesso');
   } catch (error) {
     console.error("Erro ao enviar mensagem via WhatsApp:", error);
     throw error;
@@ -264,7 +249,6 @@ export async function toggleAI(clientId: string): Promise<boolean> {
     const message = "🤖 Olá! A nossa IA foi reativada e já pode interagir comigo. Se precisar de ajuda humana, basta pedir.";
     try {
       await sendMessageToClient(clientId, message);
-      console.log(`✅ Mensagem de reativação da IA enviada para o cliente ${clientId}`);
     } catch (msgError) {
       console.error(`❌ Erro ao enviar mensagem de reativação da IA para o cliente ${clientId}:`, msgError);
     }
@@ -374,10 +358,7 @@ async function updatePlanStatusInDB(planId: string, status: string, editedConten
 
   if (status === "approved" && editedContent) {
     updateData.plan_content = editedContent;
-    console.log(`📝 DEBUG: Conteúdo editado fornecido: ${editedContent.substring(0, 100)}...`);
   }
-
-  console.log(`📋 DEBUG: Dados de atualização:`, updateData);
 
   const { error } = await supabase
     .from("pending_plans")
@@ -388,8 +369,6 @@ async function updatePlanStatusInDB(planId: string, status: string, editedConten
     console.error("❌ Erro ao atualizar status do plano:", error);
     throw error;
   }
-
-  console.log(`✅ Status do plano atualizado com sucesso para: ${status}`);
 }
 
 // Helper function to fetch plan data
@@ -477,8 +456,6 @@ async function processApprovedPlan(plan: any): Promise<void> {
 
     if (convError) {
       console.error("Erro ao atualizar estado da conversa:", convError);
-    } else {
-      console.log("✅ Estado da conversa atualizado para QUESTIONS");
     }
     
   } catch (error) {

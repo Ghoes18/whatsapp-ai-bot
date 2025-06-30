@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Debug da variável de ambiente
-console.log('ZAPI_URL carregada:', process.env.ZAPI_URL);
+
 
 const ZAPI_URL = process.env.ZAPI_URL;
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
@@ -30,9 +30,7 @@ const zapi = axios.create({
 // Enviar mensagem de texto
 export async function sendWhatsappMessage(phone: string, message: string) {
   try {
-    console.log('📤 Enviando mensagem para:', phone);
     const response = await zapi.post('/send-text', { phone, message });
-    console.log('✅ Mensagem enviada');
     return response.data;
   } catch (error) {
     console.error('❌ Erro ao enviar mensagem:', error);
@@ -134,8 +132,6 @@ export async function getContactInfo(phone: string) {
 // Enviar botões do WhatsApp
 export async function sendButtonList(phone: string, message: string, buttons: Array<{id: string, label: string}>) {
   try {
-    console.log('📤 Enviando botões para:', phone);
-    console.log('🔘 Botões:', buttons.map(b => b.label).join(', '));
     
     const response = await zapi.post('/send-button-list', {
       phone,
@@ -143,10 +139,9 @@ export async function sendButtonList(phone: string, message: string, buttons: Ar
       buttonList: {
         buttons: buttons
       }
-    });
-    
-    console.log('✅ Botões enviados');
-    return response.data;
+          });
+      
+      return response.data;
   } catch (error) {
     console.error('❌ Erro ao enviar botões:', error);
     throw error;
@@ -156,9 +151,6 @@ export async function sendButtonList(phone: string, message: string, buttons: Ar
 // Enviar lista de opções (mais elegante que botões)
 export async function sendList(phone: string, message: string, title: string, description: string, sections: Array<{title: string, rows: Array<{id: string, title: string, description?: string}>}>) {
   try {
-    console.log('📤 Enviando lista para:', phone);
-    console.log('📋 Seções:', sections.map(s => s.title).join(', '));
-    
     const response = await zapi.post('/send-list', {
       phone,
       message,
@@ -167,7 +159,6 @@ export async function sendList(phone: string, message: string, title: string, de
       sections: sections
     });
     
-    console.log('✅ Lista enviada');
     return response.data;
   } catch (error) {
     console.error('❌ Erro ao enviar lista:', error);
@@ -178,10 +169,6 @@ export async function sendList(phone: string, message: string, title: string, de
 // Enviar botões com imagem (mais visual)
 export async function sendButtonWithImage(phone: string, imageUrl: string, caption: string, buttons: Array<{id: string, label: string}>) {
   try {
-    console.log('📤 Enviando botões com imagem para:', phone);
-    console.log('🖼️ Imagem:', imageUrl);
-    console.log('🔘 Botões:', buttons.map(b => b.label).join(', '));
-    
     const response = await zapi.post('/send-button-image', {
       phone,
       image: imageUrl,
@@ -191,7 +178,6 @@ export async function sendButtonWithImage(phone: string, imageUrl: string, capti
       }
     });
     
-    console.log('✅ Botões com imagem enviados');
     return response.data;
   } catch (error) {
     console.error('❌ Erro ao enviar botões com imagem:', error);
@@ -202,9 +188,7 @@ export async function sendButtonWithImage(phone: string, imageUrl: string, capti
 // Buscar imagem de perfil do contato
 export async function getContactProfilePicture(phone: string) {
   try {
-    console.log('🖼️ Buscando foto de perfil para:', phone);
     const response = await zapi.get(`/profile-picture?phone=${phone}`);
-    console.log('✅ Foto de perfil encontrada');
     return response.data;
   } catch (error) {
     console.error('❌ Erro ao buscar foto de perfil:', error);

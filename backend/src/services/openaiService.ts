@@ -41,15 +41,11 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Função para verificar se cliente tem problemas de saúde usando IA
 export async function hasHealthConditions(context: ClientContext): Promise<boolean> {
-  console.log('🔍 DEBUG hasHealthConditions - Contexto recebido:', JSON.stringify(context, null, 2));
-  
   if (!context.health_conditions) {
-    console.log('❌ DEBUG: health_conditions está vazio ou undefined');
     return false;
   }
   
   const healthConditions = context.health_conditions.toLowerCase().trim();
-  console.log('🔍 DEBUG: health_conditions processado:', healthConditions);
   
   // Se a resposta for claramente "nenhuma condição", retornar false imediatamente
   const clearNoConditions = [
@@ -86,12 +82,10 @@ export async function hasHealthConditions(context: ClientContext): Promise<boole
   });
   
   if (isClearlyNoCondition) {
-    console.log('✅ DEBUG: Cliente claramente confirmou não ter condições de saúde');
     return false;
   }
   
   // Usar IA para interpretar se há problemas de saúde
-  console.log('🤖 DEBUG: Usando IA para interpretar condições de saúde...');
   
   try {
     const systemPrompt = `
@@ -140,27 +134,22 @@ Esta pessoa tem condições de saúde que requerem atenção especial para criar
     });
 
     const responseContent = completion.choices[0].message?.content?.trim();
-    console.log(`🤖 DEBUG: Resposta da IA: "${responseContent}"`);
     
     let result = false;
     try {
       const jsonResponse = JSON.parse(responseContent || '{}');
       result = jsonResponse.has_health_conditions === true;
-      console.log(`🔍 DEBUG: JSON parseado - has_health_conditions: ${jsonResponse.has_health_conditions}, reason: ${jsonResponse.reason}`);
     } catch (parseError) {
       console.error('❌ Erro ao fazer parse da resposta JSON:', parseError);
       // Fallback: se não conseguir fazer parse, assumir que tem problemas
       result = true;
     }
     
-    console.log(`🔍 DEBUG: Resultado final hasHealthConditions: ${result}`);
-    
     return result;
   } catch (error) {
     console.error('❌ Erro ao usar IA para interpretar condições de saúde:', error);
     
     // Fallback: se a IA falhar, usar lógica conservadora
-    console.log('⚠️ DEBUG: Usando fallback conservador - assumindo que tem problemas de saúde');
     return healthConditions.length > 0; // Se escreveu algo, assumir que pode ter problemas
   }
 }
@@ -168,15 +157,10 @@ Esta pessoa tem condições de saúde que requerem atenção especial para criar
 export async function generateTrainingAndNutritionPlan(
   context: ClientContext
 ): Promise<string> {
-  console.log('🔍 DEBUG generateTrainingAndNutritionPlan - Contexto recebido:', JSON.stringify(context, null, 2));
-  
   // NOVA REGRA: Se cliente tem problemas de saúde, não gerar plano por IA
   const hasHealthIssues = await hasHealthConditions(context);
-  console.log(`🔍 DEBUG generateTrainingAndNutritionPlan - hasHealthIssues: ${hasHealthIssues}`);
   
   if (hasHealthIssues) {
-    console.log(`🚨 Cliente ${context.name} tem problemas de saúde: ${context.health_conditions}`);
-    console.log('❌ Plano NÃO pode ser gerado por IA - Requer revisão manual');
     
     // Retornar mensagem especial indicando que requer revisão manual
     const manualReviewMessage = `⚠️ PLANO REQUER REVISÃO MANUAL ⚠️
@@ -206,11 +190,8 @@ Motivação: ${context.motivation || "Não especificada"}
 
 ⚠️ IMPORTANTE: Este plano deve ser criado manualmente por um profissional qualificado devido às condições de saúde reportadas pelo cliente.`;
     
-    console.log('🔍 DEBUG: Retornando mensagem de revisão manual');
     return manualReviewMessage;
   }
-
-  console.log('✅ DEBUG: Cliente sem problemas de saúde, gerando plano normal por IA');
 
   const systemPrompt = `
 És um coach PhD em treino e nutrição, altamente qualificado e profissional. O teu papel é criar planos detalhados e personalizados de treino e dieta, adaptados às características e objetivos do cliente. Sê motivacional, claro e organizado na resposta, usando sempre o Português de Portugal.

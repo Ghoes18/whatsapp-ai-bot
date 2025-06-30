@@ -135,10 +135,8 @@ const ClientProfile: React.FC = () => {
 
   const loadClientPlans = async (clientId: string) => {
     try {
-      console.log(`🔍 Frontend: Carregando planos para cliente ID: ${clientId}`)
       setLoadingPlans(true)
       const plansData = await dashboardAPI.getClientPlans(clientId)
-      console.log(`📋 Frontend: Planos recebidos:`, plansData)
       setPlans(plansData)
     } catch (error) {
       console.error("❌ Frontend: Erro ao carregar planos do cliente:", error)

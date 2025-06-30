@@ -91,7 +91,6 @@ async function sendButtonListAndSave(to: string, clientId: string, message: stri
 // Handler principal do webhook
 export const handleWebhook: RequestHandler = async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log("=== WEBHOOK RECEBIDO ===");
 
     // Tentar diferentes estruturas de mensagem que o ZAPI pode enviar
     let message = req.body.message;
@@ -110,7 +109,6 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
         message = req.body.webhook.message;
       }
       else {
-        console.log("❌ Estrutura de mensagem não reconhecida");
         res.status(400).send("Estrutura de mensagem inválida");
         return;
       }
@@ -150,26 +148,13 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
       message.webhook?.listResponse?.rowId;
 
     if (buttonResponse) {
-      console.log("🎯 Botão clicado:", buttonResponse);
       text = buttonResponse;
     } else if (listResponse) {
-      console.log("📋 Lista selecionada:", listResponse);
       text = listResponse;
     }
 
-    // Log adicional para debug de respostas
-    if (message.buttonsResponseMessage || message.listResponseMessage) {
-      console.log("🔍 Estrutura da resposta:", JSON.stringify({
-        buttonsResponse: message.buttonsResponseMessage,
-        listResponse: message.listResponseMessage
-      }, null, 2));
-    }
-
-    console.log("📱 De:", from, "| Texto:", text);
-
     // Verificar se é realmente uma mensagem de texto (ignorar status, typing, etc.)
     if (message.messageType && message.messageType !== 'textMessage') {
-      console.log(`📄 Ignorando tipo: ${message.messageType}`);
       res.status(200).send("Tipo de mensagem não suportado");
       return;
     }
@@ -179,18 +164,15 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
     const bodyStatusToIgnore = req.body.status && ['SENT', 'DELIVERED', 'READ'].includes(req.body.status);
     
     if (statusToIgnore || bodyStatusToIgnore || message.ack) {
-      console.log(`📊 Status ignorado: ${message.status || req.body.status || 'ACK'}`);
       res.status(200).send("Status de mensagem ignorado");
       return;
     }
 
     if (!from) {
-      console.log("❌ Número do remetente não encontrado");
       res.status(400).send("Número do remetente não encontrado");
       return;
     }
     if (!text.trim()) {
-      console.log("⚠️ Mensagem vazia ignorada");
       res.status(200).send("Mensagem vazia ignorada");
       return;
     }
@@ -214,7 +196,6 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
       .limit(5);
 
     if (recentData && recentData.some((msg: any) => msg.content === text)) {
-      console.log("🔄 DUPLICAÇÃO DETECTADA: Mensagem já processada recentemente");
       res.status(200).send("Mensagem duplicada ignorada");
       return;
     }
@@ -286,7 +267,6 @@ async function handleStartState(from: string, clientId: string) {
       console.log("❌ Erro ao criar conversa:", newConvError);
       return;
     }
-    console.log("🚀 Iniciando conversa com cliente:", from);
     await sendMessageAndSave(from, clientId, "Olá! Sou a IA da FitAI. Irei lhe atender da forma mais rápida e eficiente possível, para conseguirmos lhe dar o nosso melhor serviço.");
     const message = "Para começarmos, qual é o seu primeiro e último nome?";
     await sendMessageAndSave(from, clientId, message);
@@ -508,7 +488,6 @@ async function handleWaitingForPayment(from: string, text: string, conversation:
 async function handlePaidState(from: string, conversation: any) {
   try {
     const context = conversation?.context;
-    console.log('🔍 DEBUG handlePaidState - Contexto da conversa:', JSON.stringify(context, null, 2));
     
     if (!context) {
       await sendMessageAndSave(from, conversation.client_id, 'Não foi possível encontrar seus dados para gerar o plano.');
@@ -519,13 +498,9 @@ async function handlePaidState(from: string, conversation: any) {
     const { hasHealthConditions, generateTrainingAndNutritionPlan } = await import('./services/openaiService');
     
     // Verificar se cliente tem problemas de saúde
-    console.log('🔍 DEBUG: Chamando hasHealthConditions...');
     const hasHealthIssues = await hasHealthConditions(context);
-    console.log(`🔍 DEBUG: Resultado hasHealthIssues: ${hasHealthIssues}`);
     
     if (hasHealthIssues) {
-      console.log(`🚨 Cliente ${context.name} tem problemas de saúde: ${context.health_conditions}`);
-      console.log('⚠️ Plano será criado manualmente devido a condições de saúde');
       
       // Gerar "plano" especial para revisão manual
       const manualReviewPlan = await generateTrainingAndNutritionPlan(context);
@@ -533,8 +508,6 @@ async function handlePaidState(from: string, conversation: any) {
       // Salvar como plano pendente para revisão manual obrigatória
       const { savePendingPlan } = await import('./services/dashboardService');
       const planId = await savePendingPlan(conversation.client_id, manualReviewPlan);
-      
-      console.log(`✅ Plano para revisão manual salvo (ID: ${planId})`);
 
       // Atualizar estado da conversa para aguardar aprovação do plano
       await supabase
@@ -554,21 +527,15 @@ async function handlePaidState(from: string, conversation: any) {
       
     } else {
       // Fluxo normal para clientes sem problemas de saúde
-      console.log(`✅ Cliente ${context.name} sem problemas de saúde - Gerando plano por IA`);
-
-    // Gerar plano com OpenAI
-    const plano = await generateTrainingAndNutritionPlan(context);
+      // Gerar plano com OpenAI
+      const plano = await generateTrainingAndNutritionPlan(context);
 
       // Salvar plano como PENDENTE para revisão em vez de enviar diretamente
-    console.log('📋 Salvando plano como pendente...');
-    
-    // Importar a função savePendingPlan
-    const { savePendingPlan } = await import('./services/dashboardService');
-    
-    // Salvar como plano pendente
-    const planId = await savePendingPlan(conversation.client_id, plano);
-    
-    console.log(`✅ Plano pendente salvo (ID: ${planId})`);
+      // Importar a função savePendingPlan
+      const { savePendingPlan } = await import('./services/dashboardService');
+      
+      // Salvar como plano pendente
+      const planId = await savePendingPlan(conversation.client_id, plano);
 
     // Atualizar estado da conversa para aguardar aprovação do plano
     await supabase

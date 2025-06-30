@@ -203,21 +203,8 @@ export const dashboardAPI = {
   getMessages: (clientId: string): Promise<Message[]> =>
     api.get(`/clients/${clientId}/messages`).then(response => response.data),
 
-  sendMessage: (clientId: string, content: string): Promise<void> => {
-    console.log('API sendMessage chamado:', { clientId, content });
-    console.log('URL do request:', `${API_BASE_URL}/clients/${clientId}/messages`);
-    return api.post(`/clients/${clientId}/messages`, { content })
-      .then(response => {
-        console.log('API sendMessage sucesso:', response);
-        return response.data;
-      })
-      .catch(error => {
-        console.error('API sendMessage erro:', error);
-        console.error('Erro response data:', error.response?.data);
-        console.error('Erro response status:', error.response?.status);
-        throw error;
-      });
-  },
+  sendMessage: (clientId: string, content: string): Promise<void> =>
+    api.post(`/clients/${clientId}/messages`, { content }).then(response => response.data),
 
   sendTyping: (clientId: string, isTyping: boolean): Promise<void> =>
     api.post(`/clients/${clientId}/typing`, { isTyping }).then(response => response.data),
