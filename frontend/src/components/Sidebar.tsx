@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useLocation, matchPath } from "react-router-dom"
 import { useNotifications } from "../hooks/useNotifications"
 import { useTheme } from "../contexts/ThemeContext"
+import { useAuth } from "../contexts/AuthContext"
 import { dashboardAPI } from "../services/api"
 
 // Enhanced SVG Icons
@@ -108,11 +109,23 @@ const MoonIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
+const ArrowRightOnRectangleIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
+    />
+  </svg>
+)
+
 const Sidebar: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { notifications } = useNotifications()
   const { theme, toggleTheme } = useTheme()
+  const { signOut, user } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null)
@@ -352,9 +365,28 @@ const Sidebar: React.FC = () => {
 
         {/* Enhanced Footer */}
         <div className="absolute right-0 bottom-0 left-0 p-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700">
-          <div className="text-center">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">WhatsApp Bot v2.0</p>
-            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Powered by AI</p>
+          <div className="space-y-3">
+            {/* User info */}
+            <div className="text-center">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                {user?.email || 'Usuário'}
+              </p>
+            </div>
+
+            {/* Logout button */}
+            <button
+              onClick={signOut}
+              className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+            >
+              <ArrowRightOnRectangleIcon className="w-4 h-4" />
+              <span>Sair</span>
+            </button>
+
+            {/* Version info */}
+            <div className="text-center">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">WhatsApp Bot v2.0</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Powered by AI</p>
+            </div>
           </div>
         </div>
       </div>

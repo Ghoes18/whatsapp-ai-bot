@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { HumanSupportRequest } from '../types/humanSupport';
+import { supabase } from './supabaseClient';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/dashboard';
@@ -11,6 +12,37 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Interceptor para adicionar token de autenticação
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        config.headers.Authorization = `Bearer ${session.access_token}`;
+      }
+    } catch (error) {
+      console.error('Erro ao obter token de acesso:', error);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor para tratar erros de autenticação
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Token expirado ou inválido - fazer logout
+      await supabase.auth.signOut();
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Interfaces
 export interface Client {

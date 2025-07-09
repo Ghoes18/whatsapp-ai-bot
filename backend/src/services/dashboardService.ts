@@ -1,3 +1,4 @@
+import { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "./supabaseService";
 import { sendWhatsappMessage } from "./zapi";
 
@@ -82,9 +83,11 @@ export interface RecentActivity {
 }
 
 // Listar todos os clientes com última mensagem
-export async function getAllClients(): Promise<Client[]> {
+export async function getAllClients(
+  supabaseClient: SupabaseClient = supabase
+): Promise<Client[]> {
   try {
-    const { data: clients, error: clientError } = await supabase
+    const { data: clients, error: clientError } = await supabaseClient
       .from("clients")
       .select("*")
       .order("created_at", { ascending: false });
@@ -95,7 +98,7 @@ export async function getAllClients(): Promise<Client[]> {
     
     const clientsWithLastMessage = await Promise.all(
       clients.map(async (client: Client) => {
-        const { data: lastMessage } = await supabase
+        const { data: lastMessage } = await supabaseClient
           .from("chat_messages")
           .select("created_at")
           .eq("client_id", client.id)
@@ -125,10 +128,11 @@ export async function getAllClients(): Promise<Client[]> {
 // Obter histórico completo de uma conversa
 export async function getConversationHistory(
   clientId: string,
+  supabaseClient: SupabaseClient = supabase,
   limit?: number,
   offset?: number
 ): Promise<Message[]> {
-  let query = supabase
+  let query = supabaseClient
     .from("chat_messages")
     .select("id, client_id, role, content, created_at, read")
     .eq("client_id", clientId)
@@ -158,10 +162,11 @@ export async function getConversationHistory(
 // Enviar mensagem diretamente para o cliente
 export async function sendMessageToClient(
   clientId: string,
-  content: string
+  content: string,
+  supabaseClient: SupabaseClient = supabase
 ): Promise<void> {
   // Primeiro, buscar o número do cliente
-  const { data: client, error: clientError } = await supabase
+  const { data: client, error: clientError } = await supabaseClient
     .from("clients")
     .select("phone")
     .eq("id", clientId)
@@ -178,7 +183,7 @@ export async function sendMessageToClient(
   }
 
   // Salvar a mensagem no histórico
-  const { error: messageError } = await supabase.from("chat_messages").insert([
+  const { error: messageError } = await supabaseClient.from("chat_messages").insert([
     {
       client_id: clientId,
       role: "assistant",
@@ -192,7 +197,7 @@ export async function sendMessageToClient(
   }
 
   // Atualizar last_message_at do cliente para Realtime
-  const { error: updateError } = await supabase
+  const { error: updateError } = await supabaseClient
     .from("clients")
     .update({ 
       last_message_at: new Date().toISOString(),
@@ -215,9 +220,12 @@ export async function sendMessageToClient(
 }
 
 // Alternar status da IA para um cliente
-export async function toggleAI(clientId: string): Promise<boolean> {
+export async function toggleAI(
+  clientId: string,
+  supabaseClient: SupabaseClient = supabase
+): Promise<boolean> {
   // Primeiro, buscar o status atual e o número do cliente
-  const { data: client, error: fetchError } = await supabase
+  const { data: client, error: fetchError } = await supabaseClient
     .from("clients")
     .select("ai_enabled, phone")
     .eq("id", clientId)
@@ -231,7 +239,7 @@ export async function toggleAI(clientId: string): Promise<boolean> {
   const currentStatus = client.ai_enabled ?? true;
   const newStatus = !currentStatus;
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("clients")
     .update({
       ai_enabled: newStatus,
@@ -248,7 +256,7 @@ export async function toggleAI(clientId: string): Promise<boolean> {
   if (newStatus === true) {
     const message = "🤖 Olá! A nossa IA foi reativada e já pode interagir comigo. Se precisar de ajuda humana, basta pedir.";
     try {
-      await sendMessageToClient(clientId, message);
+      await sendMessageToClient(clientId, message, supabaseClient);
     } catch (msgError) {
       console.error(`❌ Erro ao enviar mensagem de reativação da IA para o cliente ${clientId}:`, msgError);
     }
@@ -260,14 +268,15 @@ export async function toggleAI(clientId: string): Promise<boolean> {
 // Atualizar dados do cliente
 export async function updateClientData(
   clientId: string,
-  data: Partial<Client>
+  data: Partial<Client>,
+  supabaseClient: SupabaseClient = supabase
 ): Promise<void> {
   const updateData = {
     ...data,
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("clients")
     .update(updateData)
     .eq("id", clientId);
@@ -281,9 +290,10 @@ export async function updateClientData(
 // Salvar plano pendente de revisão
 export async function savePendingPlan(
   clientId: string,
-  planContent: string
+  planContent: string,
+  supabaseClient: SupabaseClient = supabase
 ): Promise<string> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("pending_plans")
     .insert([
       {
@@ -304,8 +314,10 @@ export async function savePendingPlan(
 }
 
 // Obter planos pendentes de revisão
-export async function getPendingPlans(): Promise<PendingPlan[]> {
-  const { data: plans, error } = await supabase
+export async function getPendingPlans(
+  supabaseClient: SupabaseClient = supabase
+): Promise<PendingPlan[]> {
+  const { data: plans, error } = await supabaseClient
     .from("pending_plans")
     .select("*")
     .eq("status", "pending")
@@ -325,7 +337,7 @@ export async function getPendingPlans(): Promise<PendingPlan[]> {
 
   const plansWithClientInfo = await Promise.all(
     plans.map(async (plan: any) => {
-      const { data: client } = await supabase
+      const { data: client } = await supabaseClient
         .from("clients")
         .select("phone, name, health_conditions")
         .eq("id", plan.client_id)
@@ -353,14 +365,19 @@ export async function getPendingPlans(): Promise<PendingPlan[]> {
 }
 
 // Helper function to update plan status in database
-async function updatePlanStatusInDB(planId: string, status: string, editedContent?: string): Promise<void> {
+async function updatePlanStatusInDB(
+  planId: string, 
+  status: string, 
+  supabaseClient: SupabaseClient, 
+  editedContent?: string
+): Promise<void> {
   const updateData: any = { status };
 
   if (status === "approved" && editedContent) {
     updateData.plan_content = editedContent;
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("pending_plans")
     .update(updateData)
     .eq("id", planId);
@@ -372,12 +389,16 @@ async function updatePlanStatusInDB(planId: string, status: string, editedConten
 }
 
 // Helper function to fetch plan data
-async function fetchPlanData(planId: string, includeContent: boolean = false): Promise<any> {
+async function fetchPlanData(
+  planId: string, 
+  supabaseClient: SupabaseClient, 
+  includeContent: boolean = false
+): Promise<any> {
   const selectFields = includeContent 
     ? `client_id, plan_content, client:clients(phone, name)`
     : `client_id, client:clients(phone, name)`;
 
-  const { data: plan, error: planError } = await supabase
+  const { data: plan, error: planError } = await supabaseClient
     .from("pending_plans")
     .select(selectFields)
     .eq("id", planId)
@@ -397,16 +418,19 @@ async function fetchPlanData(planId: string, includeContent: boolean = false): P
 }
 
 // Helper function to process approved plan
-async function processApprovedPlan(plan: any): Promise<void> {
+async function processApprovedPlan(
+  plan: any, 
+  supabaseClient: SupabaseClient
+): Promise<void> {
   try {
     // Salvar plano na tabela plans
-    const savedPlanId = await saveApprovedPlan(plan.client_id, plan.plan_content);
+    const savedPlanId = await saveApprovedPlan(plan.client_id, plan.plan_content, supabaseClient);
     
     // Enviar mensagem para o cliente
     const message = `✅ Seu plano foi aprovado e está pronto!\n\n${plan.plan_content}`;
     
     // Salvar mensagem na tabela chat_messages
-    const { error: messageError } = await supabase
+    const { error: messageError } = await supabaseClient
       .from("chat_messages")
       .insert([
         {
@@ -429,7 +453,7 @@ async function processApprovedPlan(plan: any): Promise<void> {
     await sendWhatsappMessage(plan.client.phone, followUpMessage);
     
     // Salvar mensagem de follow-up na tabela chat_messages
-    const { error: followUpError } = await supabase
+    const { error: followUpError } = await supabaseClient
       .from("chat_messages")
       .insert([
         {
@@ -444,7 +468,7 @@ async function processApprovedPlan(plan: any): Promise<void> {
     }
     
     // Atualizar estado da conversa para QUESTIONS para permitir perguntas
-    const { error: convError } = await supabase
+    const { error: convError } = await supabaseClient
       .from("conversations")
       .update({ 
         state: "QUESTIONS",
@@ -465,7 +489,10 @@ async function processApprovedPlan(plan: any): Promise<void> {
 }
 
 // Helper function to notify rejected plan
-async function notifyRejectedPlan(plan: any): Promise<void> {
+async function notifyRejectedPlan(
+  plan: any,
+  supabaseClient: SupabaseClient
+): Promise<void> {
   const clientPhone = plan.client?.phone;
   const clientName = plan.client?.name;
   
@@ -480,7 +507,7 @@ async function notifyRejectedPlan(plan: any): Promise<void> {
     // Salvar e enviar cada mensagem
     for (const message of messages) {
       // Salvar na tabela chat_messages
-      const { error: messageError } = await supabase
+      const { error: messageError } = await supabaseClient
         .from("chat_messages")
         .insert([
           {
@@ -509,19 +536,20 @@ async function notifyRejectedPlan(plan: any): Promise<void> {
 export async function updatePlanStatus(
   planId: string,
   status: "approved" | "rejected",
+  supabaseClient: SupabaseClient = supabase,
   editedContent?: string
 ): Promise<void> {
   try {
     // Update plan status in database
-    await updatePlanStatusInDB(planId, status, editedContent);
+    await updatePlanStatusInDB(planId, status, supabaseClient, editedContent);
 
     // Process based on status
     if (status === "approved") {
-      const plan = await fetchPlanData(planId, true);
-      await processApprovedPlan(plan);
+      const plan = await fetchPlanData(planId, supabaseClient, true);
+      await processApprovedPlan(plan, supabaseClient);
     } else if (status === "rejected") {
-      const plan = await fetchPlanData(planId, false);
-      await notifyRejectedPlan(plan);
+      const plan = await fetchPlanData(planId, supabaseClient, false);
+      await notifyRejectedPlan(plan, supabaseClient);
     }
   } catch (error) {
     console.error(`Erro ao atualizar status do plano ${planId}:`, error);
@@ -530,10 +558,14 @@ export async function updatePlanStatus(
 }
 
 // Salvar plano aprovado na tabela plans
-export async function saveApprovedPlan(clientId: string, planContent: string): Promise<string> {
+export async function saveApprovedPlan(
+  clientId: string, 
+  planContent: string,
+  supabaseClient: SupabaseClient = supabase
+): Promise<string> {
   try {
     // Verificar se o cliente existe
-    const { data: client, error: clientError } = await supabase
+    const { data: client, error: clientError } = await supabaseClient
       .from("clients")
       .select("id, phone, name")
       .eq("id", clientId)
@@ -568,7 +600,7 @@ export async function saveApprovedPlan(clientId: string, planContent: string): P
     };
 
     // Inserir o plano com o conteúdo diretamente
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("plans")
       .insert(planData)
       .select("id")
@@ -586,8 +618,11 @@ export async function saveApprovedPlan(clientId: string, planContent: string): P
 }
 
 // Buscar um cliente específico
-export async function getClientById(clientId: string): Promise<Client | null> {
-  const { data, error } = await supabase
+export async function getClientById(
+  clientId: string,
+  supabaseClient: SupabaseClient = supabase
+): Promise<Client | null> {
+  const { data, error } = await supabaseClient
     .from("clients")
     .select("*")
     .eq("id", clientId)
@@ -605,10 +640,13 @@ export async function getClientById(clientId: string): Promise<Client | null> {
 }
 
 // Obter estatísticas do cliente
-export async function getClientStats(clientId: string) {
+export async function getClientStats(
+  clientId: string,
+  supabaseClient: SupabaseClient = supabase
+) {
   try {
     // Contar mensagens
-    const { count: messageCount, error: messageError } = await supabase
+    const { count: messageCount, error: messageError } = await supabaseClient
       .from("chat_messages")
       .select("*", { count: "exact", head: true })
       .eq("client_id", clientId);
@@ -618,7 +656,7 @@ export async function getClientStats(clientId: string) {
     }
 
     // Contar planos
-    const { count: planCount, error: planError } = await supabase
+    const { count: planCount, error: planError } = await supabaseClient
       .from("plans")
       .select("*", { count: "exact", head: true })
       .eq("client_id", clientId);
@@ -628,7 +666,7 @@ export async function getClientStats(clientId: string) {
     }
 
     // Última atividade
-    const { data: lastMessage } = await supabase
+    const { data: lastMessage } = await supabaseClient
       .from("chat_messages")
       .select("created_at")
       .eq("client_id", clientId)
@@ -652,10 +690,13 @@ export async function getClientStats(clientId: string) {
 }
 
 // Obter histórico de planos de um cliente
-export async function getClientPlans(clientId: string): Promise<Plan[]> {
+export async function getClientPlans(
+  clientId: string,
+  supabaseClient: SupabaseClient = supabase
+): Promise<Plan[]> {
   try {
     // Primeiro, verificar se o cliente existe
-    const { data: client, error: clientError } = await supabase
+    const { data: client, error: clientError } = await supabaseClient
       .from("clients")
       .select("id, phone, name")
       .eq("id", clientId)
@@ -670,7 +711,7 @@ export async function getClientPlans(clientId: string): Promise<Plan[]> {
     }
     
     // Buscar planos
-    const { data: plans, error } = await supabase
+    const { data: plans, error } = await supabaseClient
       .from("plans")
       .select("id, client_id, type, plan_content, pdf_url, created_at, expires_at")
       .eq("client_id", clientId)
@@ -711,9 +752,12 @@ export async function getClientPlans(clientId: string): Promise<Plan[]> {
 }
 
 // Obter conteúdo de um plano específico
-export async function getPlanContent(planId: string): Promise<any> {
+export async function getPlanContent(
+  planId: string,
+  supabaseClient: SupabaseClient = supabase
+): Promise<any> {
   try {
-    const { data: plan, error } = await supabase
+    const { data: plan, error } = await supabaseClient
       .from("plans")
       .select(`
         id,
@@ -763,10 +807,12 @@ export async function getPlanContent(planId: string): Promise<any> {
 }
 
 // Obter estatísticas gerais do dashboard
-export async function getDashboardStats() {
+export async function getDashboardStats(
+  supabaseClient: SupabaseClient = supabase
+) {
   try {
     // Total de clientes
-    const { count: totalClients, error: clientsError } = await supabase
+    const { count: totalClients, error: clientsError } = await supabaseClient
       .from("clients")
       .select("*", { count: "exact", head: true });
 
@@ -775,7 +821,7 @@ export async function getDashboardStats() {
     }
 
     // Conversas ativas (clientes com AI ativa)
-    const { count: activeConversations, error: activeError } = await supabase
+    const { count: activeConversations, error: activeError } = await supabaseClient
       .from("clients")
       .select("*", { count: "exact", head: true })
       .eq("ai_enabled", true);
@@ -785,7 +831,7 @@ export async function getDashboardStats() {
     }
 
     // Planos pendentes
-    const { count: pendingPlans, error: pendingError } = await supabase
+    const { count: pendingPlans, error: pendingError } = await supabaseClient
       .from("pending_plans")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending");
@@ -797,7 +843,7 @@ export async function getDashboardStats() {
     // Mensagens de hoje
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const { count: todayMessages, error: messagesError } = await supabase
+    const { count: todayMessages, error: messagesError } = await supabaseClient
       .from("chat_messages")
       .select("*", { count: "exact", head: true })
       .gte("created_at", today.toISOString());
@@ -807,7 +853,7 @@ export async function getDashboardStats() {
     }
 
     // Requests de suporte humano pendentes
-    const { count: humanSupportRequests, error: supportError } = await supabase
+    const { count: humanSupportRequests, error: supportError } = await supabaseClient
       .from("human_support_requests")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending");
@@ -817,7 +863,7 @@ export async function getDashboardStats() {
     }
 
     // Clientes que pagaram (taxa de conversão)
-    const { count: paidClients, error: paidError } = await supabase
+    const { count: paidClients, error: paidError } = await supabaseClient
       .from("clients")
       .select("*", { count: "exact", head: true })
       .eq("paid", true);
@@ -829,7 +875,7 @@ export async function getDashboardStats() {
     // Planos entregues (aprovados) nos últimos 7 dias
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const { count: weeklyPlans, error: weeklyError } = await supabase
+    const { count: weeklyPlans, error: weeklyError } = await supabaseClient
       .from("plans")
       .select("*", { count: "exact", head: true })
       .gte("created_at", sevenDaysAgo.toISOString());
@@ -864,19 +910,21 @@ export async function getDashboardStats() {
 }
 
 // Obter estatísticas avançadas para o dashboard
-export async function getAdvancedDashboardStats() {
+export async function getAdvancedDashboardStats(
+  supabaseClient: SupabaseClient = supabase
+) {
   try {
     // Taxa de resposta (mensagens respondidas vs mensagens recebidas nas últimas 24h)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     
-    const { data: userMessages } = await supabase
+    const { data: userMessages } = await supabaseClient
       .from("chat_messages")
       .select("id, client_id")
       .eq("role", "user")
       .gte("created_at", yesterday.toISOString());
 
-    const { data: botMessages } = await supabase
+    const { data: botMessages } = await supabaseClient
       .from("chat_messages")
       .select("id, client_id")
       .eq("role", "assistant")
@@ -890,7 +938,7 @@ export async function getAdvancedDashboardStats() {
     const avgResponseTime = responseRate > 90 ? "< 1 min" : responseRate > 70 ? "2-3 min" : "5+ min";
 
     // Distribuição de objetivos dos clientes
-    const { data: clientGoals } = await supabase
+    const { data: clientGoals } = await supabaseClient
       .from("clients")
       .select("goal")
       .not("goal", "is", null);
@@ -910,7 +958,7 @@ export async function getAdvancedDashboardStats() {
       .map(([goal, count]) => ({ goal, count }));
 
     // Crescimento de clientes nos últimos 7 dias
-    const { data: weeklyClients } = await supabase
+    const { data: weeklyClients } = await supabaseClient
       .from("clients")
       .select("created_at")
       .gte("created_at", yesterday.toISOString());
@@ -918,7 +966,7 @@ export async function getAdvancedDashboardStats() {
     const clientGrowth = weeklyClients?.length || 0;
 
     // Satisfação estimada baseada em interações (clientes que continuaram conversando)
-    const { data: activeClientsWithMessages } = await supabase
+    const { data: activeClientsWithMessages } = await supabaseClient
       .from("chat_messages")
       .select("client_id")
       .gte("created_at", yesterday.toISOString())
@@ -950,27 +998,30 @@ export async function getAdvancedDashboardStats() {
 }
 
 // Obter métricas de performance por período
-export async function getDashboardMetrics(days: number = 7) {
+export async function getDashboardMetrics(
+  supabaseClient: SupabaseClient = supabase,
+  days: number = 7
+) {
   try {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     
     // Novos clientes por dia
-    const { data: newClientsData } = await supabase
+    const { data: newClientsData } = await supabaseClient
       .from("clients")
       .select("created_at")
       .gte("created_at", startDate.toISOString())
       .order("created_at", { ascending: true });
 
     // Mensagens por dia
-    const { data: messagesData } = await supabase
+    const { data: messagesData } = await supabaseClient
       .from("chat_messages")
       .select("created_at")
       .gte("created_at", startDate.toISOString())
       .order("created_at", { ascending: true });
 
     // Planos criados por dia
-    const { data: plansData } = await supabase
+    const { data: plansData } = await supabaseClient
       .from("plans")
       .select("created_at")
       .gte("created_at", startDate.toISOString())
@@ -1008,10 +1059,12 @@ export async function getDashboardMetrics(days: number = 7) {
 }
 
 // Obter atividade recente
-export async function getRecentActivity(): Promise<RecentActivity[]> {
+export async function getRecentActivity(
+  supabaseClient: SupabaseClient = supabase
+): Promise<RecentActivity[]> {
   try {
     // Mensagens recentes
-    const { data: recentMessages } = await supabase
+    const { data: recentMessages } = await supabaseClient
       .from("chat_messages")
       .select(
         `
@@ -1027,7 +1080,7 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
       .limit(3);
 
     // Planos pendentes recentes
-    const { data: recentPendingPlansData } = await supabase
+    const { data: recentPendingPlansData } = await supabaseClient
       .from("pending_plans")
       .select("id, created_at, client_id")
       .eq("status", "pending")
@@ -1035,7 +1088,7 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
       .limit(2);
 
     // Planos aprovados recentes (da tabela plans)
-    const { data: recentApprovedPlansData } = await supabase
+    const { data: recentApprovedPlansData } = await supabaseClient
       .from("plans")
       .select("id, created_at, client_id")
       .order("created_at", { ascending: false })
@@ -1044,7 +1097,7 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
     // Processar planos pendentes
     const recentPendingPlans = recentPendingPlansData ? await Promise.all(
       recentPendingPlansData.map(async (plan: any) => {
-        const { data: client } = await supabase
+        const { data: client } = await supabaseClient
           .from('clients')
           .select('phone, name')
           .eq('id', plan.client_id)
@@ -1061,7 +1114,7 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
     // Processar planos aprovados
     const recentApprovedPlans = recentApprovedPlansData ? await Promise.all(
       recentApprovedPlansData.map(async (plan: any) => {
-        const { data: client } = await supabase
+        const { data: client } = await supabaseClient
           .from('clients')
           .select('phone, name')
           .eq('id', plan.client_id)
@@ -1076,7 +1129,7 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
     ) : [];
 
     // Novos clientes recentes
-    const { data: recentClients } = await supabase
+    const { data: recentClients } = await supabaseClient
       .from("clients")
       .select("id, phone, name, created_at")
       .order("created_at", { ascending: false })
@@ -1155,10 +1208,12 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
 }
 
 // Obter contagens de mensagens não lidas por cliente
-export async function getUnreadMessageCounts(): Promise<{ [clientId: string]: number }> {
+export async function getUnreadMessageCounts(
+  supabaseClient: SupabaseClient = supabase
+): Promise<{ [clientId: string]: number }> {
   try {
     // Buscar mensagens não lidas (onde read é false ou null)
-    const { data: unreadMessages, error } = await supabase
+    const { data: unreadMessages, error } = await supabaseClient
       .from("chat_messages")
       .select("client_id, id")
       .or("read.is.null,read.eq.false")
@@ -1186,9 +1241,12 @@ export async function getUnreadMessageCounts(): Promise<{ [clientId: string]: nu
 }
 
 // Marcar todas as mensagens de um cliente como lidas
-export async function markClientMessagesAsRead(clientId: string): Promise<{ success: boolean; markedCount: number }> {
+export async function markClientMessagesAsRead(
+  clientId: string,
+  supabaseClient: SupabaseClient = supabase
+): Promise<{ success: boolean; markedCount: number }> {
   try {
-    const { data: messages, error: fetchError } = await supabase
+    const { data: messages, error: fetchError } = await supabaseClient
       .from("chat_messages")
       .select("id")
       .eq("client_id", clientId)
@@ -1206,7 +1264,7 @@ export async function markClientMessagesAsRead(clientId: string): Promise<{ succ
 
     const messageIds = messages.map((msg: { id: string }) => msg.id);
     
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseClient
       .from("chat_messages")
       .update({ read: true })
       .in("id", messageIds);
@@ -1225,11 +1283,13 @@ export async function markClientMessagesAsRead(clientId: string): Promise<{ succ
 }
 
 // Função de debug para listar todos os planos
-export async function debugListAllPlans(): Promise<any[]> {
+export async function debugListAllPlans(
+  supabaseClient: SupabaseClient = supabase
+): Promise<any[]> {
   try {
     console.log("🔍 DEBUG: Listando todos os planos na tabela...");
     
-    const { data: allPlans, error } = await supabase
+    const { data: allPlans, error } = await supabaseClient
       .from("plans")
       .select("*")
       .order("created_at", { ascending: false });
@@ -1251,11 +1311,12 @@ export async function debugListAllPlans(): Promise<any[]> {
 // Criar plano manual para cliente (usado em casos de problemas de saúde)
 export async function createManualPlan(
   clientId: string, 
-  planContent: string
+  planContent: string,
+  supabaseClient: SupabaseClient = supabase
 ): Promise<string> {
   try {
     // Verificar se o cliente existe e buscar seus dados
-    const { data: client, error: clientError } = await supabase
+    const { data: client, error: clientError } = await supabaseClient
       .from("clients")
       .select("id, phone, name")
       .eq("id", clientId)
@@ -1270,7 +1331,7 @@ export async function createManualPlan(
     }
 
     // Salvar como plano pendente para seguir o fluxo normal de aprovação
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("pending_plans")
       .insert([
         {
@@ -1316,7 +1377,7 @@ Precisas de algum esclarecimento sobre o plano?`;
       await sendWhatsappMessage(client.phone, message);
       
       // Salvar a mensagem no histórico de chat
-      await supabase.from("chat_messages").insert([
+      await supabaseClient.from("chat_messages").insert([
         {
           client_id: clientId,
           role: "assistant",
@@ -1341,11 +1402,12 @@ Precisas de algum esclarecimento sobre o plano?`;
 // NOVA FUNÇÃO: Enviar plano manual diretamente ao cliente
 export async function sendManualPlanToClient(
   clientId: string, 
-  planContent: string
+  planContent: string,
+  supabaseClient: SupabaseClient = supabase
 ): Promise<string> {
   try {
     // Verificar se o cliente existe e buscar seus dados
-    const { data: client, error: clientError } = await supabase
+    const { data: client, error: clientError } = await supabaseClient
       .from("clients")
       .select("id, phone, name")
       .eq("id", clientId)
@@ -1384,7 +1446,7 @@ Precisas de algum esclarecimento sobre o plano?`;
     await sendWhatsappMessage(client.phone, message);
     
     // Salvar como plano aprovado diretamente na tabela plans
-    const { data: planData, error: planError } = await supabase
+    const { data: planData, error: planError } = await supabaseClient
       .from("plans")
       .insert([
         {
@@ -1403,7 +1465,7 @@ Precisas de algum esclarecimento sobre o plano?`;
     }
     
     // Salvar a mensagem no histórico de chat
-    await supabase.from("chat_messages").insert([
+    await supabaseClient.from("chat_messages").insert([
       {
         client_id: clientId,
         role: "assistant",
@@ -1412,7 +1474,7 @@ Precisas de algum esclarecimento sobre o plano?`;
     ]);
 
     // Remover todos os planos pendentes para este cliente (já que foi resolvido manualmente)
-    const { error: deletePendingError } = await supabase
+    const { error: deletePendingError } = await supabaseClient
       .from("pending_plans")
       .delete()
       .eq("client_id", clientId)
@@ -1424,7 +1486,7 @@ Precisas de algum esclarecimento sobre o plano?`;
     }
 
     // Atualizar estado da conversa para QUESTIONS para permitir perguntas sobre o plano
-    const { error: convError } = await supabase
+    const { error: convError } = await supabaseClient
       .from("conversations")
       .update({ 
         state: "QUESTIONS",
@@ -1449,9 +1511,12 @@ Precisas de algum esclarecimento sobre o plano?`;
 }
 
 // Buscar dados completos do cliente para criação de plano manual
-export async function getClientForManualPlan(clientId: string): Promise<any> {
+export async function getClientForManualPlan(
+  clientId: string,
+  supabaseClient: SupabaseClient = supabase
+): Promise<any> {
   try {
-    const { data: client, error } = await supabase
+    const { data: client, error } = await supabaseClient
       .from("clients")
       .select(`
         id, 
@@ -1491,45 +1556,69 @@ export async function getClientForManualPlan(clientId: string): Promise<any> {
 // Atualizar conteúdo do plano pendente (para salvamento temporário)
 export async function updatePendingPlanContent(
   clientId: string, 
-  planContent: string
+  planContent: string,
+  supabaseClient: SupabaseClient = supabase
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Buscar plano pendente existente para este cliente
-    const { data: existingPlan, error: findError } = await supabase
+    const { data: existingPlan, error: findError } = await supabaseClient
       .from("pending_plans")
       .select("id")
       .eq("client_id", clientId)
       .eq("status", "pending")
       .single();
 
-    if (findError || !existingPlan) {
-      return { success: false, message: "Plano pendente não encontrado" };
+    if (findError && findError.code !== 'PGRST116') { // 'PGRST116' means no rows found
+      console.error("Erro ao buscar plano pendente:", findError);
+      throw findError;
     }
 
-    // Atualizar o conteúdo do plano pendente
-    const { error: updateError } = await supabase
-      .from("pending_plans")
-      .update({
-        plan_content: planContent
-      })
-      .eq("id", existingPlan.id);
+    if (existingPlan) {
+      // Atualizar o plano existente
+      const { error: updateError } = await supabaseClient
+        .from("pending_plans")
+        .update({ plan_content: planContent, updated_at: new Date().toISOString() })
+        .eq("id", existingPlan.id);
 
-    if (updateError) {
-      throw updateError;
+      if (updateError) {
+        throw updateError;
+      }
+
+      console.log(`✅ Conteúdo do plano pendente atualizado para cliente ${clientId}`);
+      return { success: true, message: "Rascunho do plano pendente atualizado com sucesso." };
+    } else {
+      // Criar um novo plano pendente
+      const { error: insertError } = await supabaseClient
+        .from("pending_plans")
+        .insert({
+          client_id: clientId,
+          plan_content: planContent,
+          status: "pending",
+          updated_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      console.log(`✅ Plano pendente criado para o cliente ${clientId}`);
+      return { success: true, message: "Plano pendente criado com sucesso." };
     }
-
-    console.log(`✅ Conteúdo do plano pendente atualizado para cliente ${clientId}`);
-    return { success: true, message: "Plano salvo como rascunho" };
   } catch (error) {
     console.error("Erro ao atualizar plano pendente:", error);
     return { success: false, message: "Erro ao salvar rascunho" };
   }
 }
 
-// Buscar plano pendente atual para um cliente
-export async function getCurrentPendingPlan(clientId: string): Promise<string | null> {
+// Obter conteúdo do plano pendente atual (rascunho)
+export async function getCurrentPendingPlan(
+  clientId: string,
+  supabaseClient: SupabaseClient = supabase
+): Promise<string | null> {
   try {
-    const { data: plan, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("pending_plans")
       .select("plan_content")
       .eq("client_id", clientId)
@@ -1541,7 +1630,7 @@ export async function getCurrentPendingPlan(clientId: string): Promise<string | 
       return null;
     }
 
-    return plan?.plan_content || null;
+    return data?.plan_content || null;
   } catch (error) {
     console.error("Erro ao buscar plano pendente:", error);
     return null;

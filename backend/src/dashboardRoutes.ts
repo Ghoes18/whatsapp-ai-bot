@@ -38,13 +38,20 @@ import {
   deleteAllAdminConversations
 } from './services/adminChatHistoryService';
 import { supabase } from './services/supabaseService';
+import { authMiddleware, type AuthenticatedRequest } from './middleware/authMiddleware';
 
 const router = express.Router();
 
+// Aplicar middleware de autenticação a todas as rotas
+router.use(authMiddleware);
+
 // Dashboard stats
-router.get('/stats', async (req, res) => {
+router.get('/stats', async (req: AuthenticatedRequest, res) => {
   try {
-    const stats = await getDashboardStats();
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const stats = await getDashboardStats(req.supabase);
     res.json(stats);
   } catch (error) {
     console.error('Erro ao buscar estatísticas do dashboard:', error);
@@ -53,9 +60,12 @@ router.get('/stats', async (req, res) => {
 });
 
 // Advanced dashboard stats
-router.get('/stats/advanced', async (req, res) => {
+router.get('/stats/advanced', async (req: AuthenticatedRequest, res) => {
   try {
-    const advancedStats = await getAdvancedDashboardStats();
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const advancedStats = await getAdvancedDashboardStats(req.supabase);
     res.json(advancedStats);
   } catch (error) {
     console.error('Erro ao buscar estatísticas avançadas do dashboard:', error);
@@ -64,10 +74,13 @@ router.get('/stats/advanced', async (req, res) => {
 });
 
 // Dashboard metrics with period
-router.get('/metrics', async (req, res) => {
+router.get('/metrics', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { days } = req.query;
-    const metrics = await getDashboardMetrics(days ? parseInt(days as string) : 7);
+    const metrics = await getDashboardMetrics(req.supabase, days ? parseInt(days as string) : 7);
     res.json(metrics);
   } catch (error) {
     console.error('Erro ao buscar métricas do dashboard:', error);
@@ -76,9 +89,12 @@ router.get('/metrics', async (req, res) => {
 });
 
 // Recent activity
-router.get('/recent-activity', async (req, res) => {
+router.get('/recent-activity', async (req: AuthenticatedRequest, res) => {
   try {
-    const activity = await getRecentActivity();
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const activity = await getRecentActivity(req.supabase);
     res.json(activity);
   } catch (error) {
     console.error('Erro ao buscar atividade recente:', error);
@@ -87,9 +103,12 @@ router.get('/recent-activity', async (req, res) => {
 });
 
 // Unread message counts
-router.get('/messages/unread-counts', async (req, res) => {
+router.get('/messages/unread-counts', async (req: AuthenticatedRequest, res) => {
   try {
-    const counts = await getUnreadMessageCounts();
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const counts = await getUnreadMessageCounts(req.supabase);
     res.json(counts);
   } catch (error) {
     console.error('Erro ao buscar contagens de mensagens não lidas:', error);
@@ -98,9 +117,12 @@ router.get('/messages/unread-counts', async (req, res) => {
 });
 
 // Get all clients
-router.get('/clients', async (req, res) => {
+router.get('/clients', async (req: AuthenticatedRequest, res) => {
   try {
-    const clients = await getAllClients();
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const clients = await getAllClients(req.supabase);
     res.json(clients);
   } catch (error) {
     console.error('Erro ao buscar clientes:', error);
@@ -109,9 +131,12 @@ router.get('/clients', async (req, res) => {
 });
 
 // Get specific client
-router.get('/clients/:clientId', async (req, res) => {
+router.get('/clients/:clientId', async (req: AuthenticatedRequest, res) => {
   try {
-    const client = await getClientById(req.params.clientId);
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const client = await getClientById(req.params.clientId, req.supabase);
     if (!client) {
       return res.status(404).json({ error: 'Cliente não encontrado' });
     }
@@ -123,9 +148,12 @@ router.get('/clients/:clientId', async (req, res) => {
 });
 
 // Get client stats
-router.get('/clients/:clientId/stats', async (req, res) => {
+router.get('/clients/:clientId/stats', async (req: AuthenticatedRequest, res) => {
   try {
-    const stats = await getClientStats(req.params.clientId);
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const stats = await getClientStats(req.params.clientId, req.supabase);
     res.json(stats);
   } catch (error) {
     console.error('Erro ao buscar estatísticas do cliente:', error);
@@ -134,9 +162,12 @@ router.get('/clients/:clientId/stats', async (req, res) => {
 });
 
 // Get client plans
-router.get('/clients/:clientId/plans', async (req, res) => {
+router.get('/clients/:clientId/plans', async (req: AuthenticatedRequest, res) => {
   try {
-    const plans = await getClientPlans(req.params.clientId);
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const plans = await getClientPlans(req.params.clientId, req.supabase);
     res.json(plans);
   } catch (error) {
     console.error('Erro ao buscar planos do cliente:', error);
@@ -145,9 +176,12 @@ router.get('/clients/:clientId/plans', async (req, res) => {
 });
 
 // Update client
-router.put('/clients/:clientId', async (req, res) => {
+router.put('/clients/:clientId', async (req: AuthenticatedRequest, res) => {
   try {
-    await updateClientData(req.params.clientId, req.body);
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    await updateClientData(req.params.clientId, req.body, req.supabase);
     res.json({ success: true });
   } catch (error) {
     console.error('Erro ao atualizar cliente:', error);
@@ -156,9 +190,12 @@ router.put('/clients/:clientId', async (req, res) => {
 });
 
 // Toggle AI for client
-router.post('/clients/:clientId/toggle-ai', async (req, res) => {
+router.post('/clients/:clientId/toggle-ai', async (req: AuthenticatedRequest, res) => {
   try {
-    const newStatus = await toggleAI(req.params.clientId);
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const newStatus = await toggleAI(req.params.clientId, req.supabase);
     res.json({ ai_enabled: newStatus });
   } catch (error) {
     console.error('Erro ao alternar IA:', error);
@@ -167,18 +204,21 @@ router.post('/clients/:clientId/toggle-ai', async (req, res) => {
 });
 
 // Get client profile picture from WhatsApp
-router.get('/clients/:clientId/profile-picture', async (req, res) => {
+router.get('/clients/:clientId/profile-picture', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { clientId } = req.params;
     
     // Buscar dados do cliente para obter o telefone
-    const client = await getClientById(clientId);
+    const client = await getClientById(clientId, req.supabase);
     if (!client) {
       return res.status(404).json({ error: 'Cliente não encontrado' });
     }
     
     // Verificar se já temos uma imagem de perfil salva recentemente (cache de 1 hora)
-    const { data: cachedData, error: cacheError } = await supabase
+    const { data: cachedData, error: cacheError } = await req.supabase
       .from('clients')
       .select('profile_picture_url, updated_at')
       .eq('id', clientId)
@@ -199,7 +239,7 @@ router.get('/clients/:clientId/profile-picture', async (req, res) => {
     
     if (profilePictureData?.link) {
       // Salvar a nova URL na base de dados
-      const { error: updateError } = await supabase
+      const { error: updateError } = await req.supabase
         .from('clients')
         .update({ 
           profile_picture_url: profilePictureData.link,
@@ -223,11 +263,15 @@ router.get('/clients/:clientId/profile-picture', async (req, res) => {
 });
 
 // Get client messages
-router.get('/clients/:clientId/messages', async (req, res) => {
+router.get('/clients/:clientId/messages', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { limit, offset } = req.query;
     const messages = await getConversationHistory(
       req.params.clientId,
+      req.supabase,
       limit ? parseInt(limit as string) : undefined,
       offset ? parseInt(offset as string) : undefined
     );
@@ -239,14 +283,17 @@ router.get('/clients/:clientId/messages', async (req, res) => {
 });
 
 // Send message to client
-router.post('/clients/:clientId/messages', async (req, res) => {
+router.post('/clients/:clientId/messages', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { content } = req.body;
     if (!content) {
       return res.status(400).json({ error: 'Conteúdo da mensagem é obrigatório' });
     }
     
-    await sendMessageToClient(req.params.clientId, content);
+    await sendMessageToClient(req.params.clientId, content, req.supabase);
     res.json({ success: true });
   } catch (error) {
     console.error('Erro ao enviar mensagem:', error);
@@ -255,9 +302,12 @@ router.post('/clients/:clientId/messages', async (req, res) => {
 });
 
 // Mark client messages as read
-router.post('/clients/:clientId/messages/mark-read', async (req, res) => {
+router.post('/clients/:clientId/messages/mark-read', async (req: AuthenticatedRequest, res) => {
   try {
-    const result = await markClientMessagesAsRead(req.params.clientId);
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const result = await markClientMessagesAsRead(req.params.clientId, req.supabase);
     res.json(result);
   } catch (error) {
     console.error('Erro ao marcar mensagens como lidas:', error);
@@ -266,9 +316,12 @@ router.post('/clients/:clientId/messages/mark-read', async (req, res) => {
 });
 
 // Get pending plans
-router.get('/pending-plans', async (req, res) => {
+router.get('/pending-plans', async (req: AuthenticatedRequest, res) => {
   try {
-    const plans = await getPendingPlans();
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const plans = await getPendingPlans(req.supabase);
     res.json(plans);
   } catch (error) {
     console.error('Erro ao buscar planos pendentes:', error);
@@ -277,14 +330,17 @@ router.get('/pending-plans', async (req, res) => {
 });
 
 // Review pending plan
-router.post('/pending-plans/:planId/review', async (req, res) => {
+router.post('/pending-plans/:planId/review', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { status, editedContent } = req.body;
     if (!status || !['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ error: 'Status inválido' });
     }
     
-    await updatePlanStatus(req.params.planId, status, editedContent);
+    await updatePlanStatus(req.params.planId, status, req.supabase, editedContent);
     res.json({ success: true });
   } catch (error) {
     console.error('Erro ao revisar plano:', error);
@@ -293,15 +349,17 @@ router.post('/pending-plans/:planId/review', async (req, res) => {
 });
 
 // Create manual plan for client (used for health condition cases)
-router.post('/manual-plans', async (req, res) => {
+router.post('/manual-plans', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { clientId, planContent } = req.body;
     if (!clientId || !planContent) {
       return res.status(400).json({ error: 'clientId e planContent são obrigatórios' });
     }
     
-    const { createManualPlan } = await import('./services/dashboardService');
-    const planId = await createManualPlan(clientId, planContent);
+    const planId = await createManualPlan(clientId, planContent, req.supabase);
     res.json({ planId, success: true });
   } catch (error) {
     console.error('Erro ao criar plano manual:', error);
@@ -310,14 +368,17 @@ router.post('/manual-plans', async (req, res) => {
 });
 
 // Send manual plan directly to client (NEW - for immediate sending)
-router.post('/send-manual-plan', async (req, res) => {
+router.post('/send-manual-plan', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { clientId, planContent } = req.body;
     if (!clientId || !planContent) {
       return res.status(400).json({ error: 'clientId e planContent são obrigatórios' });
     }
     
-    const planId = await sendManualPlanToClient(clientId, planContent);
+    const planId = await sendManualPlanToClient(clientId, planContent, req.supabase);
     res.json({ planId, success: true, message: 'Plano enviado com sucesso para o cliente' });
   } catch (error) {
     console.error('Erro ao enviar plano manual:', error);
@@ -326,15 +387,17 @@ router.post('/send-manual-plan', async (req, res) => {
 });
 
 // Get client data for manual plan creation
-router.get('/clients/:clientId/for-manual-plan', async (req, res) => {
+router.get('/clients/:clientId/for-manual-plan', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { clientId } = req.params;
     if (!clientId) {
       return res.status(400).json({ error: 'clientId é obrigatório' });
     }
     
-    const { getClientForManualPlan } = await import('./services/dashboardService');
-    const client = await getClientForManualPlan(clientId);
+    const client = await getClientForManualPlan(clientId, req.supabase);
     res.json({ client });
   } catch (error) {
     console.error('Erro ao buscar dados do cliente para plano manual:', error);
@@ -343,14 +406,17 @@ router.get('/clients/:clientId/for-manual-plan', async (req, res) => {
 });
 
 // Create pending plan
-router.post('/pending-plans', async (req, res) => {
+router.post('/pending-plans', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { clientId, planContent } = req.body;
     if (!clientId || !planContent) {
       return res.status(400).json({ error: 'clientId e planContent são obrigatórios' });
     }
     
-    const planId = await savePendingPlan(clientId, planContent);
+    const planId = await savePendingPlan(clientId, planContent, req.supabase);
     res.json({ planId });
   } catch (error) {
     console.error('Erro ao criar plano pendente:', error);
@@ -359,9 +425,12 @@ router.post('/pending-plans', async (req, res) => {
 });
 
 // Get plan content
-router.get('/plans/:planId/content', async (req, res) => {
+router.get('/plans/:planId/content', async (req: AuthenticatedRequest, res) => {
   try {
-    const plan = await getPlanContent(req.params.planId);
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const plan = await getPlanContent(req.params.planId, req.supabase);
     res.json({ plan });
   } catch (error) {
     console.error('Erro ao buscar conteúdo do plano:', error);
@@ -370,9 +439,12 @@ router.get('/plans/:planId/content', async (req, res) => {
 });
 
 // Debug endpoint to list all plans
-router.get('/debug/plans', async (req, res) => {
+router.get('/debug/plans', async (req: AuthenticatedRequest, res) => {
   try {
-    const plans = await debugListAllPlans();
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const plans = await debugListAllPlans(req.supabase);
     res.json(plans);
   } catch (error) {
     console.error('Erro ao listar planos (debug):', error);
@@ -521,10 +593,13 @@ router.post('/admin/conversations/:conversationId/generate-title', async (req, r
 });
 
 // Human Support Requests endpoints
-router.get('/human-support-requests', async (req, res) => {
+router.get('/human-support-requests', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { status } = req.query;
-    let query = supabase
+    let query = req.supabase
       .from('human_support_requests')
       .select(`
         *,
@@ -554,9 +629,12 @@ router.get('/human-support-requests', async (req, res) => {
   }
 });
 
-router.get('/human-support-requests/count', async (req, res) => {
+router.get('/human-support-requests/count', async (req: AuthenticatedRequest, res) => {
   try {
-    const { data, error } = await supabase
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
+    const { data, error } = await req.supabase
       .from('human_support_requests')
       .select('*', { count: 'exact', head: true });
 
@@ -572,12 +650,15 @@ router.get('/human-support-requests/count', async (req, res) => {
   }
 });
 
-router.put('/human-support-requests/:requestId', async (req, res) => {
+router.put('/human-support-requests/:requestId', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { requestId } = req.params;
     const { status, handledBy, notes } = req.body;
 
-    const { error } = await supabase
+    const { error } = await req.supabase
       .from('human_support_requests')
       .update({
         status,
@@ -600,15 +681,18 @@ router.put('/human-support-requests/:requestId', async (req, res) => {
 });
 
 // Update pending plan content (save as draft)
-router.put('/pending-plans/:clientId/content', async (req, res) => {
+router.put('/pending-plans/:clientId/content', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { clientId } = req.params;
     const { planContent } = req.body;
     if (!clientId || !planContent) {
       return res.status(400).json({ error: 'clientId e planContent são obrigatórios' });
     }
     
-    const result = await updatePendingPlanContent(clientId, planContent);
+    const result = await updatePendingPlanContent(clientId, planContent, req.supabase);
     res.json(result);
   } catch (error) {
     console.error('Erro ao atualizar plano pendente:', error);
@@ -617,14 +701,17 @@ router.put('/pending-plans/:clientId/content', async (req, res) => {
 });
 
 // Get current pending plan content
-router.get('/pending-plans/:clientId/content', async (req, res) => {
+router.get('/pending-plans/:clientId/content', async (req: AuthenticatedRequest, res) => {
   try {
+    if (!req.supabase) {
+      return res.status(500).json({ error: 'Supabase client not initialized' });
+    }
     const { clientId } = req.params;
     if (!clientId) {
       return res.status(400).json({ error: 'clientId é obrigatório' });
     }
     
-    const content = await getCurrentPendingPlan(clientId);
+    const content = await getCurrentPendingPlan(clientId, req.supabase);
     res.json({ content });
   } catch (error) {
     console.error('Erro ao buscar plano pendente:', error);
