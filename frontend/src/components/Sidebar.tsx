@@ -376,7 +376,7 @@ const Sidebar: React.FC = () => {
             {/* Logout button */}
             <button
               onClick={signOut}
-              className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+              className="flex justify-center items-center px-3 py-2 space-x-2 w-full text-sm font-medium text-gray-600 rounded-lg transition-all duration-200 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <ArrowRightOnRectangleIcon className="w-4 h-4" />
               <span>Sair</span>
