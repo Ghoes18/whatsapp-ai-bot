@@ -355,7 +355,7 @@ npm run build
 - [ ] Versão mobile nativa
 
 ### Melhorias Técnicas
-- [ ] Testes automatizados
+- [x] Testes automatizados
 - [ ] Docker containers
 - [ ] CI/CD pipeline
 - [ ] Métricas avançadas
@@ -369,6 +369,55 @@ npm run build
 3. Commit suas mudanças (`git commit -am 'Adiciona nova funcionalidade'`)
 4. Push para a branch (`git push origin feature/nova-funcionalidade`)
 5. Abra um Pull Request
+
+## 🧪 Testes
+
+O projeto agora inclui testes automatizados completos para garantir a qualidade e confiabilidade do código.
+
+### Backend (Jest + TypeScript)
+```bash
+cd backend
+npm test
+```
+
+**Cobertura de Testes:**
+- ✅ **Detecção de Condições de Saúde** - Verifica se o sistema identifica corretamente clientes com problemas de saúde
+- ✅ **Geração de Planos** - Testa a criação de planos personalizados via IA
+- ✅ **Mocking OpenAI** - Testes rápidos sem chamadas reais à API
+
+### Frontend (Vitest + React Testing Library)
+```bash
+cd frontend
+npm test
+```
+
+**Cobertura de Testes:**
+- ✅ **Renderização de Componentes** - Testa se os componentes são renderizados corretamente
+- ✅ **Interações do Usuário** - Verifica cliques, formulários e navegação
+- ✅ **Integração com Providers** - Testa contextos (Auth, Theme) e estados
+
+### Estrutura de Testes
+```
+backend/
+├── jest.config.ts          # Configuração Jest
+└── tests/
+    └── openaiService.test.ts # Testes do serviço de IA
+
+frontend/
+├── vitest.config.ts         # Configuração Vitest
+├── tests/
+│   ├── setup.ts            # Setup global (mocks, matchers)
+│   └── AdminAIChat.test.tsx # Testes do chat admin
+```
+
+### Executar Todos os Testes
+```bash
+# Backend
+cd backend && npm test
+
+# Frontend  
+cd frontend && npm test
+```
 
 ## 📄 Licença
 
