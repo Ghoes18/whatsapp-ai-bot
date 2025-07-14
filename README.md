@@ -349,10 +349,6 @@ npm run build
 - [ ] Integração com mais gateways de pagamento
 - [ ] Sistema de agendamento de consultas
 - [ ] Análise de progresso dos clientes
-- [ ] Integração com wearables
-- [ ] Sistema de referências/afiliados
-- [ ] API pública para integrações
-- [ ] Versão mobile nativa
 
 ### Melhorias Técnicas
 - [x] Testes automatizados

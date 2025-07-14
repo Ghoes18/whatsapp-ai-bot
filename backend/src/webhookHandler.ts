@@ -13,6 +13,7 @@ const STATES = {
   WAITING_FOR_PAYMENT: "WAITING_FOR_PAYMENT",
   PAID: "PAID",
   QUESTIONS: "QUESTIONS",
+  REVIEWING_INFO: "REVIEWING_INFO", // Novo estado para revisão
 } as const;
 type State = typeof STATES[keyof typeof STATES];
 
@@ -22,6 +23,14 @@ const BUTTON_QUESTIONS = {
   EXPERIENCE: "experience",
   AVAILABLE_DAYS: "available_days",
   EXERCISE_PREFERENCES: "exercise_preferences",
+} as const;
+
+// Constantes para comandos especiais
+const COMMANDS = {
+  BACK: ["voltar", "anterior", "corrigir", "mudar"],
+  CONFIRM: ["confirmar", "sim", "correto", "ok"],
+  CANCEL: ["cancelar", "não", "incorreto", "recomeçar"],
+  REVIEW: ["revisar", "ver", "resumo"]
 } as const;
 
 interface ClientContext {
@@ -39,8 +48,17 @@ interface ClientContext {
   equipment?: string;
   motivation?: string;
   currentQuestion?: string;
+  previousQuestion?: string; // Para permitir voltar
+  questionOrder?: string[]; // Para controlar a ordem das perguntas
   [key: string]: any;
 }
+
+// Ordem das perguntas para navegação
+const QUESTION_ORDER = [
+  'name', 'age', 'goal', 'gender', 'height', 'weight', 
+  'experience', 'available_days', 'health_conditions', 
+  'exercise_preferences', 'dietary_restrictions', 'equipment', 'motivation'
+];
 
 // Nova função que combina envio e salvamento
 async function sendMessageAndSave(to: string, clientId: string, content: string) {
@@ -86,6 +104,61 @@ async function sendButtonListAndSave(to: string, clientId: string, message: stri
   } catch (error) {
     console.error('❌ Erro ao enviar/salvar botões:', error);
   }
+}
+
+// Função para detectar comandos especiais
+function detectCommand(text: string): string | null {
+  const lowerText = text.toLowerCase().trim();
+  
+  if (COMMANDS.BACK.some(cmd => lowerText.includes(cmd))) return 'BACK';
+  if (COMMANDS.CONFIRM.some(cmd => lowerText.includes(cmd))) return 'CONFIRM';
+  if (COMMANDS.CANCEL.some(cmd => lowerText.includes(cmd))) return 'CANCEL';
+  if (COMMANDS.REVIEW.some(cmd => lowerText.includes(cmd))) return 'REVIEW';
+  
+  return null;
+}
+
+// Função para obter a pergunta anterior
+function getPreviousQuestion(currentQuestion: string): string | null {
+  const currentIndex = QUESTION_ORDER.indexOf(currentQuestion);
+  if (currentIndex > 0) {
+    return QUESTION_ORDER[currentIndex - 1];
+  }
+  return null;
+}
+
+// Função para obter a próxima pergunta
+function getNextQuestion(currentQuestion: string): string | null {
+  const currentIndex = QUESTION_ORDER.indexOf(currentQuestion);
+  if (currentIndex < QUESTION_ORDER.length - 1) {
+    return QUESTION_ORDER[currentIndex + 1];
+  }
+  return null;
+}
+
+// Função para gerar resumo das informações coletadas
+function generateInfoSummary(context: ClientContext): string {
+  const summary = `📋 *RESUMO DAS SUAS INFORMAÇÕES:*
+
+👤 *Nome:* ${context.name || 'Não informado'}
+🎂 *Idade:* ${context.age || 'Não informado'} anos
+🎯 *Objetivo:* ${context.goal || 'Não informado'}
+⚥ *Gênero:* ${context.gender || 'Não informado'}
+📏 *Altura:* ${context.height || 'Não informado'} cm
+⚖️ *Peso:* ${context.weight || 'Não informado'} kg
+💪 *Experiência:* ${context.experience || 'Não informado'}
+📅 *Dias por semana:* ${context.available_days || 'Não informado'}
+🏥 *Condições de saúde:* ${context.health_conditions || 'Não informado'}
+🏃 *Preferências de exercício:* ${context.exercise_preferences || 'Não informado'}
+🥗 *Restrições alimentares:* ${context.dietary_restrictions || 'Não informado'}
+🏋️ *Equipamento disponível:* ${context.equipment || 'Não informado'}
+🎯 *Motivação:* ${context.motivation || 'Não informado'}
+
+✅ Se todas as informações estão corretas, digite *"confirmar"*
+🔄 Para corrigir alguma informação, digite *"corrigir [campo]"* (ex: "corrigir idade") ou *"corrigir [campo]"*
+❌ Para recomeçar, digite *"recomeçar"*`;
+
+  return summary;
 }
 
 // Handler principal do webhook
@@ -229,6 +302,9 @@ export const handleWebhook: RequestHandler = async (req: Request, res: Response)
       case STATES.WAITING_FOR_INFO:
         await handleWaitingForInfo(from, text, conversation);
         break;
+      case STATES.REVIEWING_INFO:
+        await handleReviewingInfo(from, text, conversation);
+        break;
       case STATES.WAITING_FOR_PAYMENT:
         await handleWaitingForPayment(from, text, conversation);
         break;
@@ -258,7 +334,7 @@ async function handleStartState(from: string, clientId: string) {
         {
           client_id: clientId,
           state: STATES.WAITING_FOR_INFO,
-          context: {},
+          context: { questionOrder: QUESTION_ORDER },
         },
       ])
       .select()
@@ -267,18 +343,52 @@ async function handleStartState(from: string, clientId: string) {
       console.log("❌ Erro ao criar conversa:", newConvError);
       return;
     }
-    await sendMessageAndSave(from, clientId, "Olá! Sou a IA da FitAI. Irei lhe atender da forma mais rápida e eficiente possível, para conseguirmos lhe dar o nosso melhor serviço.");
-    const message = "Para começarmos, qual é o seu primeiro e último nome?";
-    await sendMessageAndSave(from, clientId, message);
+    
+    const welcomeMessage = `🤖 *Olá! Sou a IA da FitAI* 
+
+Vou criar um plano personalizado de treino e nutrição especialmente para você!
+
+📝 *INSTRUÇÕES IMPORTANTES:*
+• Responda uma pergunta de cada vez
+• Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*
+• Para ver suas respostas: digite *"revisar"*
+• Seja honesto nas respostas para um melhor plano
+
+Vamos começar! 👇
+
+*Qual é o seu primeiro e último nome?*
+
+💡 _Exemplo: João Silva_`;
+
+    await sendMessageAndSave(from, clientId, welcomeMessage);
   } catch (error) {
     console.log("❌ Erro no estado START:", error);
   }
 }
 
-// Coleta informações do cliente
+// Coleta informações do cliente com sistema de correção melhorado
 async function handleWaitingForInfo(from: string, text: string, conversation: any) {
   try {
     const context: ClientContext = conversation?.context || {};
+    
+    // Detectar comandos especiais primeiro
+    const command = detectCommand(text);
+    
+    if (command === 'BACK') {
+      await handleBackCommand(from, conversation);
+      return;
+    }
+    
+    if (command === 'REVIEW') {
+      const summary = generateInfoSummary(context);
+      await sendMessageAndSave(from, conversation.client_id, summary);
+      return;
+    }
+    
+    if (command === 'CANCEL') {
+      await handleCancelCommand(from, conversation);
+      return;
+    }
     
     // Verificar se é uma resposta de botão válida
     const currentQuestion = context.currentQuestion;
@@ -289,14 +399,15 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
       switch (currentQuestion) {
         case BUTTON_QUESTIONS.GENDER:
           context.gender = mappedValue;
+          context.previousQuestion = 'gender';
           context.currentQuestion = undefined;
           await updateConversationContext(conversation?.id, context);
-          const message = "Qual sua altura em cm? (ex: 175)";
-          await sendMessageAndSave(from, conversation.client_id, message);
+          await askHeightQuestion(from, conversation.client_id);
           break;
           
         case BUTTON_QUESTIONS.EXPERIENCE:
           context.experience = mappedValue;
+          context.previousQuestion = 'experience';
           context.currentQuestion = undefined;
           await updateConversationContext(conversation?.id, context);
           await sendAvailableDaysQuestion(from, conversation.client_id);
@@ -306,18 +417,18 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
           
         case BUTTON_QUESTIONS.AVAILABLE_DAYS:
           context.available_days = mappedValue;
+          context.previousQuestion = 'available_days';
           context.currentQuestion = undefined;
           await updateConversationContext(conversation?.id, context);
-          const message2 = "Tem alguma condição de saúde ou lesão que deva considerar? (se não, responda 'nenhuma')";
-          await sendMessageAndSave(from, conversation.client_id, message2);
+          await askHealthConditionsQuestion(from, conversation.client_id);
           break;
           
         case BUTTON_QUESTIONS.EXERCISE_PREFERENCES:
           context.exercise_preferences = mappedValue;
+          context.previousQuestion = 'exercise_preferences';
           context.currentQuestion = undefined;
           await updateConversationContext(conversation?.id, context);
-          const message3 = "Tem restrições alimentares ou alergias? (se não, responda 'nenhuma')";
-          await sendMessageAndSave(from, conversation.client_id, message3);
+          await askDietaryRestrictionsQuestion(from, conversation.client_id);
           break;
       }
       return;
@@ -325,7 +436,12 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
     
     // Se não é uma resposta válida de botão, verificar se deveria ser
     if (currentQuestion) {
-      const warningMessage = "⚠️ Por favor, use os botões fornecidos para responder. Vou repetir a pergunta:";
+      const warningMessage = `⚠️ *Por favor, use os botões fornecidos para responder.*
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*
+📋 Para ver suas respostas, digite *"revisar"*
+
+Vou repetir a pergunta:`;
       await sendMessageAndSave(from, conversation.client_id, warningMessage);
       
       // Repetir a pergunta com botões
@@ -349,32 +465,82 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
     // Fluxo normal para perguntas de texto livre
     if (!context.name) {
       context.name = text;
+      context.previousQuestion = 'name';
       await updateConversationContext(conversation?.id, context);
-      const message = `Prazer, ${text}! Qual sua idade?`;
-      await sendMessageAndSave(from, conversation.client_id, message);
+      await askAgeQuestion(from, conversation.client_id);
     } else if (!context.age) {
+      // Validar idade
+      const age = parseInt(text);
+      if (isNaN(age) || age < 16 || age > 100) {
+        const errorMessage = `❌ *Idade inválida!*
+
+Por favor, digite uma idade válida entre 16 e 100 anos.
+
+💡 _Exemplo: 25_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+        await sendMessageAndSave(from, conversation.client_id, errorMessage);
+        return;
+      }
+      
       context.age = text;
+      context.previousQuestion = 'age';
       await updateConversationContext(conversation?.id, context);
-      const message = "Qual seu objetivo principal? (ex: emagrecer, ganhar massa, etc)";
-      await sendMessageAndSave(from, conversation.client_id, message);
+      await askGoalQuestion(from, conversation.client_id);
     } else if (!context.goal) {
       context.goal = text;
+      context.previousQuestion = 'goal';
       await updateConversationContext(conversation?.id, context);
-      const message1 = "Perfeito! Agora preciso de mais algumas informações:";
-      await sendMessageAndSave(from, conversation.client_id, message1);
+      
+      const transitionMessage = `✅ *Perfeito, ${context.name}!*
+
+Agora preciso de algumas informações físicas para criar seu plano personalizado:`;
+      await sendMessageAndSave(from, conversation.client_id, transitionMessage);
       
       // Usar botões para gênero
       await sendGenderQuestion(from, conversation.client_id);
       context.currentQuestion = BUTTON_QUESTIONS.GENDER;
       await updateConversationContext(conversation?.id, context);
     } else if (!context.height) {
+      // Validar altura
+      const height = parseFloat(text);
+      if (isNaN(height) || height < 120 || height > 250) {
+        const errorMessage = `❌ *Altura inválida!*
+
+Por favor, digite sua altura em centímetros (entre 120 e 250 cm).
+
+💡 _Exemplo: 175_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+        await sendMessageAndSave(from, conversation.client_id, errorMessage);
+        return;
+      }
+      
       context.height = text;
+      context.previousQuestion = 'height';
       await updateConversationContext(conversation?.id, context);
-      const message = "Qual seu peso atual em kg? (ex: 70)";
-      await sendMessageAndSave(from, conversation.client_id, message);
+      await askWeightQuestion(from, conversation.client_id);
     } else if (!context.weight) {
+      // Validar peso
+      const weight = parseFloat(text);
+      if (isNaN(weight) || weight < 30 || weight > 300) {
+        const errorMessage = `❌ *Peso inválido!*
+
+Por favor, digite seu peso em quilogramas (entre 30 e 300 kg).
+
+💡 _Exemplo: 70_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+        await sendMessageAndSave(from, conversation.client_id, errorMessage);
+        return;
+      }
+      
       context.weight = text;
+      context.previousQuestion = 'weight';
       await updateConversationContext(conversation?.id, context);
+      
+      const transitionMessage = `💪 *Agora vamos falar sobre sua experiência com exercícios:*`;
+      await sendMessageAndSave(from, conversation.client_id, transitionMessage);
       
       // Usar botões para experiência
       await sendExperienceQuestion(from, conversation.client_id);
@@ -382,7 +548,11 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
       await updateConversationContext(conversation?.id, context);
     } else if (!context.health_conditions) {
       context.health_conditions = text;
+      context.previousQuestion = 'health_conditions';
       await updateConversationContext(conversation?.id, context);
+      
+      const transitionMessage = `🏃 *Agora vamos definir suas preferências de exercício:*`;
+      await sendMessageAndSave(from, conversation.client_id, transitionMessage);
       
       // Usar botões para preferências de exercício
       await sendExercisePreferencesQuestion(from, conversation.client_id);
@@ -390,31 +560,335 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
       await updateConversationContext(conversation?.id, context);
     } else if (!context.dietary_restrictions) {
       context.dietary_restrictions = text;
+      context.previousQuestion = 'dietary_restrictions';
       await updateConversationContext(conversation?.id, context);
-      const message = "Que equipamento tem disponível? (ex: halteres, elásticos, apenas peso corporal)";
-      await sendMessageAndSave(from, conversation.client_id, message);
+      await askEquipmentQuestion(from, conversation.client_id);
     } else if (!context.equipment) {
       context.equipment = text;
+      context.previousQuestion = 'equipment';
       await updateConversationContext(conversation?.id, context);
-      const message = "Qual é a sua principal motivação para treinar? (ex: saúde, estética, competição)";
-      await sendMessageAndSave(from, conversation.client_id, message);
+      await askMotivationQuestion(from, conversation.client_id);
     } else if (!context.motivation) {
       context.motivation = text;
+      context.previousQuestion = 'motivation';
       await updateConversationContext(conversation?.id, context);
       
-      // TODAS AS INFORMAÇÕES COLETADAS - SALVAR NA TABELA CLIENTS
-      console.log('💾 Salvando dados do cliente...');
-      
-      try {
-        // Atualizar dados do cliente na tabela clients
+      // Mostrar resumo e pedir confirmação
+      await transitionToReview(from, conversation);
+    } else {
+      const message = `✅ *Suas informações já foram coletadas!*
+
+📋 Para ver o resumo, digite *"revisar"*
+🔄 Para corrigir algo, digite *"corrigir [campo]"*`;
+      await sendMessageAndSave(from, conversation.client_id, message);
+    }
+  } catch (error) {
+    console.log("❌ Erro no estado WAITING_FOR_INFO:", error);
+  }
+}
+
+// Novo handler para o estado de revisão
+async function handleReviewingInfo(from: string, text: string, conversation: any) {
+  try {
+    const context: ClientContext = conversation?.context || {};
+    const command = detectCommand(text);
+    
+    if (command === 'CONFIRM') {
+      // Confirmar informações e prosseguir para pagamento
+      await finalizeInfoCollection(from, conversation, context);
+      return;
+    }
+    
+    if (command === 'CANCEL') {
+      await handleCancelCommand(from, conversation);
+      return;
+    }
+    
+    // Verificar se é um comando de correção específico
+    const lowerText = text.toLowerCase().trim();
+    if (lowerText.startsWith('corrigir') || lowerText.startsWith('corrigir')) {
+      const field = lowerText.replace(/^(corrigir|corrigir)/, '').trim();
+      await handleFieldCorrection(from, conversation, field);
+      return;
+    }
+    
+    // Se não é um comando reconhecido, mostrar ajuda
+    const helpMessage = `❓ *Comando não reconhecido.*
+
+📋 *Comandos disponíveis:*
+• *"confirmar"* - Confirmar informações e prosseguir
+• *"corrigir [campo]"* ou *"corrigir [campo]"* - Corrigir informação específica
+• *"recomeçar"* - Recomeçar do início
+• *"revisar"* - Ver resumo novamente
+
+💡 _Exemplo: "corrigir idade", "corrigir nome" ou "corrigir peso"_`;
+    
+    await sendMessageAndSave(from, conversation.client_id, helpMessage);
+    
+    // Mostrar resumo novamente
+    const summary = generateInfoSummary(context);
+    await sendMessageAndSave(from, conversation.client_id, summary);
+  } catch (error) {
+    console.error("❌ Erro no estado REVIEWING_INFO:", error);
+  }
+}
+
+// Função para lidar com comando "voltar"
+async function handleBackCommand(from: string, conversation: any) {
+  const context: ClientContext = conversation?.context || {};
+  
+  // Determinar qual é a pergunta atual baseada no que já foi preenchido
+  let currentQuestionField = getCurrentQuestionField(context);
+  
+  console.log(`🔄 Voltando para: ${currentQuestionField}`);
+  
+  if (!currentQuestionField) {
+    const message = `❌ *Não há pergunta anterior para voltar.*
+
+Você está no início do questionário.`;
+    await sendMessageAndSave(from, conversation.client_id, message);
+    return;
+  }
+  
+  // Limpar a resposta da pergunta atual
+  delete context[currentQuestionField];
+  
+  // Limpar currentQuestion se for uma pergunta com botões
+  if (context.currentQuestion) {
+    delete context.currentQuestion;
+  }
+  
+  // Determinar a pergunta anterior
+  const currentIndex = QUESTION_ORDER.indexOf(currentQuestionField);
+  if (currentIndex > 0) {
+    context.previousQuestion = QUESTION_ORDER[currentIndex - 1];
+  } else {
+    delete context.previousQuestion;
+  }
+  
+  const backMessage = `🔄 *Voltando para corrigir...*`;
+  await sendMessageAndSave(from, conversation.client_id, backMessage);
+  
+  // Fazer a pergunta que deve ser corrigida
+  await askQuestion(from, conversation.client_id, currentQuestionField, context);
+  
+  // Atualizar contexto após definir currentQuestion (se aplicável)
+  await updateConversationContext(conversation?.id, context);
+}
+
+// Função para lidar com comando "recomeçar"
+async function handleCancelCommand(from: string, conversation: any) {
+  const confirmMessage = `🔄 *Tem certeza que deseja recomeçar?*
+
+Todas as suas respostas serão perdidas.
+
+✅ Digite *"sim"* para confirmar
+❌ Digite *"não"* para continuar`;
+  
+  await sendMessageAndSave(from, conversation.client_id, confirmMessage);
+  
+  // Aguardar confirmação (implementar lógica de confirmação se necessário)
+  // Por agora, vamos recomeçar diretamente
+  await restartConversation(from, conversation);
+}
+
+// Função para recomeçar a conversa
+async function restartConversation(from: string, conversation: any) {
+  // Limpar contexto
+  const newContext = { questionOrder: QUESTION_ORDER };
+  
+  await supabase
+    .from("conversations")
+    .update({ 
+      state: STATES.WAITING_FOR_INFO,
+      context: newContext 
+    })
+    .eq("id", conversation.id);
+  
+  const restartMessage = `🔄 *Conversa reiniciada!*
+
+Vamos começar novamente:
+
+*Qual é o seu primeiro e último nome?*
+
+💡 _Exemplo: João Silva_`;
+  
+  await sendMessageAndSave(from, conversation.client_id, restartMessage);
+}
+
+// Função para fazer uma pergunta específica
+async function askQuestion(from: string, clientId: string, questionType: string, context: ClientContext) {
+  // Limpar currentQuestion antes de fazer nova pergunta
+  context.currentQuestion = undefined;
+  
+  switch (questionType) {
+    case 'name':
+      await askNameQuestion(from, clientId);
+      break;
+    case 'age':
+      await askAgeQuestion(from, clientId);
+      break;
+    case 'goal':
+      await askGoalQuestion(from, clientId);
+      break;
+    case 'gender':
+      await sendGenderQuestion(from, clientId);
+      context.currentQuestion = BUTTON_QUESTIONS.GENDER;
+      break;
+    case 'height':
+      await askHeightQuestion(from, clientId);
+      break;
+    case 'weight':
+      await askWeightQuestion(from, clientId);
+      break;
+    case 'experience':
+      await sendExperienceQuestion(from, clientId);
+      context.currentQuestion = BUTTON_QUESTIONS.EXPERIENCE;
+      break;
+    case 'available_days':
+      await sendAvailableDaysQuestion(from, clientId);
+      context.currentQuestion = BUTTON_QUESTIONS.AVAILABLE_DAYS;
+      break;
+    case 'health_conditions':
+      await askHealthConditionsQuestion(from, clientId);
+      break;
+    case 'exercise_preferences':
+      await sendExercisePreferencesQuestion(from, clientId);
+      context.currentQuestion = BUTTON_QUESTIONS.EXERCISE_PREFERENCES;
+      break;
+    case 'dietary_restrictions':
+      await askDietaryRestrictionsQuestion(from, clientId);
+      break;
+    case 'equipment':
+      await askEquipmentQuestion(from, clientId);
+      break;
+    case 'motivation':
+      await askMotivationQuestion(from, clientId);
+      break;
+  }
+  
+  // Nota: O contexto será atualizado pela função que chama askQuestion
+}
+
+// Funções para fazer perguntas específicas com mensagens consolidadas
+async function askNameQuestion(from: string, clientId: string) {
+  const message = `*Qual é o seu primeiro e último nome?*
+
+💡 _Exemplo: João Silva_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+  await sendMessageAndSave(from, clientId, message);
+}
+
+async function askAgeQuestion(from: string, clientId: string) {
+  const message = `*Qual sua idade?*
+
+💡 _Digite apenas o número (ex: 25)_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+  await sendMessageAndSave(from, clientId, message);
+}
+
+async function askGoalQuestion(from: string, clientId: string) {
+  const message = `*Qual seu objetivo principal?*
+
+💡 _Exemplos: emagrecer, ganhar massa muscular, definir o corpo, melhorar condicionamento_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+  await sendMessageAndSave(from, clientId, message);
+}
+
+async function askHeightQuestion(from: string, clientId: string) {
+  const message = `*Qual sua altura em centímetros?*
+
+💡 _Digite apenas o número (ex: 175)_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+  await sendMessageAndSave(from, clientId, message);
+}
+
+async function askWeightQuestion(from: string, clientId: string) {
+  const message = `*Qual seu peso atual em quilogramas?*
+
+💡 _Digite apenas o número (ex: 70)_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+  await sendMessageAndSave(from, clientId, message);
+}
+
+async function askHealthConditionsQuestion(from: string, clientId: string) {
+  const message = `*Tem alguma condição de saúde ou lesão que deva considerar?*
+
+⚠️ _Seja específico para sua segurança (ex: hipertensão, diabetes, lesão no joelho)_
+✅ _Se não tem nenhuma, digite "nenhuma"_
+
+🔄 Para voltar, digite *"voltar"*`;
+  await sendMessageAndSave(from, clientId, message);
+}
+
+async function askDietaryRestrictionsQuestion(from: string, clientId: string) {
+  const message = `*Tem restrições alimentares ou alergias?*
+
+💡 _Exemplos: vegetariano, alergia a lactose, intolerância ao glúten_
+✅ _Se não tem nenhuma, digite "nenhuma"_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+  await sendMessageAndSave(from, clientId, message);
+}
+
+async function askEquipmentQuestion(from: string, clientId: string) {
+  const message = `*Que equipamento tem disponível para treinar?*
+
+💡 _Exemplos: academia completa, halteres em casa, elásticos, apenas peso corporal_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+  await sendMessageAndSave(from, clientId, message);
+}
+
+async function askMotivationQuestion(from: string, clientId: string) {
+  const message = `*Qual é a sua principal motivação para treinar?*
+
+💡 _Exemplos: saúde, estética, competição, bem-estar mental_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
+  await sendMessageAndSave(from, clientId, message);
+}
+
+// Função para transicionar para revisão
+async function transitionToReview(from: string, conversation: any) {
+  const context: ClientContext = conversation?.context || {};
+  
+  // Atualizar estado para revisão
+  await supabase
+    .from("conversations")
+    .update({ state: STATES.REVIEWING_INFO })
+    .eq("id", conversation.id);
+  
+  const transitionMessage = `🎉 *Excelente! Coletamos todas as informações necessárias.*
+
+Agora vou mostrar um resumo para você confirmar:`;
+  
+  await sendMessageAndSave(from, conversation.client_id, transitionMessage);
+  
+  // Mostrar resumo
+  const summary = generateInfoSummary(context);
+  await sendMessageAndSave(from, conversation.client_id, summary);
+}
+
+// Função para finalizar coleta de informações
+async function finalizeInfoCollection(from: string, conversation: any, context: ClientContext) {
+  try {
+    // Salvar dados do cliente na tabela clients
+    console.log('💾 Salvando dados...');
+    
         const { error: clientUpdateError } = await supabase
           .from("clients")
           .update({
             name: context.name,
-            age: parseInt(context.age) || null,
+        age: parseInt(context.age || '0') || null,
             gender: context.gender,
-            height: parseFloat(context.height) || null,
-            weight: parseFloat(context.weight) || null,
+        height: parseFloat(context.height || '0') || null,
+        weight: parseFloat(context.weight || '0') || null,
             goal: context.goal,
             experience: context.experience,
             available_days: context.available_days,
@@ -430,30 +904,102 @@ async function handleWaitingForInfo(from: string, text: string, conversation: an
 
         if (clientUpdateError) {
           console.error('❌ Erro ao atualizar dados do cliente:', clientUpdateError);
-        } else {
-          console.log('✅ Dados do cliente salvos');
-        }
-      } catch (error) {
-        console.error('❌ Erro ao salvar dados do cliente:', error);
+              } else {
+        console.log('✅ Dados salvos');
       }
       
       // Avançar para pagamento
       await supabase
         .from("conversations")
         .update({ state: STATES.WAITING_FOR_PAYMENT })
-        .eq("id", conversation?.id);
-        
-      const message1 = `Obrigado ${context.name}! Agora você receberá o link para pagamento via Mbway.`;
-      const message2 = "💳 Link de pagamento: [IMPLEMENTAR MBWAY]";
-      await sendMessageAndSave(from, conversation.client_id, message1);
-      await sendMessageAndSave(from, conversation.client_id, message2);
-    } else {
-      const message = "Suas informações já foram coletadas. Aguarde o processamento.";
-      await sendMessageAndSave(from, conversation.client_id, message);
-    }
+      .eq("id", conversation.id);
+      
+    const paymentMessage = `✅ *Informações confirmadas com sucesso!*
+
+Obrigado, ${context.name}! Agora você receberá o link para pagamento via Mbway.
+
+💳 *Link de pagamento:* [IMPLEMENTAR MBWAY]
+
+📱 Após o pagamento, envie o comprovativo para continuar.`;
+    
+    await sendMessageAndSave(from, conversation.client_id, paymentMessage);
+    
   } catch (error) {
-    console.log("❌ Erro no estado WAITING_FOR_INFO:", error);
+    console.error('❌ Erro ao finalizar coleta de informações:', error);
+    await sendMessageAndSave(from, conversation.client_id, 'Erro ao processar suas informações. Tente novamente.');
   }
+}
+
+// Função para corrigir campo específico
+async function handleFieldCorrection(from: string, conversation: any, field: string) {
+  const context: ClientContext = conversation?.context || {};
+  
+  // Mapear nomes de campos para chaves do contexto
+  const fieldMapping: { [key: string]: string } = {
+    'nome': 'name',
+    'idade': 'age',
+    'objetivo': 'goal',
+    'gênero': 'gender',
+    'genero': 'gender',
+    'altura': 'height',
+    'peso': 'weight',
+    'experiência': 'experience',
+    'experiencia': 'experience',
+    'dias': 'available_days',
+    'saúde': 'health_conditions',
+    'saude': 'health_conditions',
+    'condições': 'health_conditions',
+    'condicoes': 'health_conditions',
+    'exercícios': 'exercise_preferences',
+    'exercicios': 'exercise_preferences',
+    'preferências': 'exercise_preferences',
+    'preferencias': 'exercise_preferences',
+    'restrições': 'dietary_restrictions',
+    'restricoes': 'dietary_restrictions',
+    'alimentares': 'dietary_restrictions',
+    'dieta': 'dietary_restrictions',
+    'equipamento': 'equipment',
+    'motivação': 'motivation',
+    'motivacao': 'motivation'
+  };
+  
+  const fieldKey = fieldMapping[field] || field;
+  
+  if (!QUESTION_ORDER.includes(fieldKey)) {
+    const errorMessage = `❌ *Campo não reconhecido: "${field}"*
+
+📋 *Campos disponíveis para correção:*
+• nome, idade, objetivo, gênero
+• altura, peso, experiência, dias
+• saúde, exercícios, restrições, equipamento, motivação
+
+💡 _Exemplo: "corrigir idade" ou "corrigir nome"_`;
+    
+    await sendMessageAndSave(from, conversation.client_id, errorMessage);
+    return;
+  }
+  
+  // Limpar o campo e voltar para essa pergunta
+  delete context[fieldKey];
+  context.previousQuestion = fieldKey;
+  
+  // Voltar para estado de coleta
+  await supabase
+    .from("conversations")
+    .update({ 
+      state: STATES.WAITING_FOR_INFO,
+      context: context 
+    })
+    .eq("id", conversation.id);
+  
+  const correctionMessage = `🔄 *Corrigindo "${field}"...*
+
+Vou repetir a pergunta:`;
+  
+  await sendMessageAndSave(from, conversation.client_id, correctionMessage);
+  
+  // Fazer a pergunta novamente
+  await askQuestion(from, conversation.client_id, fieldKey, context);
 }
 
 // Estado de pagamento
@@ -614,9 +1160,13 @@ async function handleQuestionsState(from: string, text: string, conversation: an
   }
 }
 
-// Funções auxiliares para botões (versão elegante)
+// Funções auxiliares para botões (versão melhorada)
 async function sendGenderQuestion(from: string, clientId: string) {
-  const message = "Qual seu gênero?";
+  const message = `*Qual seu gênero?*
+
+💡 _Use os botões abaixo para responder_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
   const buttons = [
     { id: "masculino", label: "Masculino" },
     { id: "feminino", label: "Feminino" }
@@ -626,7 +1176,11 @@ async function sendGenderQuestion(from: string, clientId: string) {
 }
 
 async function sendExperienceQuestion(from: string, clientId: string) {
-  const message = "Qual sua experiência com exercícios?";
+  const message = `*Qual sua experiência com exercícios?*
+
+💡 _Use os botões abaixo para responder_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
   const buttons = [
     { id: "iniciante", label: "Iniciante" },
     { id: "intermediario", label: "Intermediário" },
@@ -637,7 +1191,11 @@ async function sendExperienceQuestion(from: string, clientId: string) {
 }
 
 async function sendAvailableDaysQuestion(from: string, clientId: string) {
-  const message = "Quantos dias por semana pode treinar?";
+  const message = `*Quantos dias por semana pode treinar?*
+
+💡 _Use os botões abaixo para responder_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
   const buttons = [
     { id: "2_dias", label: "2 dias" },
     { id: "3_dias", label: "3 dias" },
@@ -650,7 +1208,11 @@ async function sendAvailableDaysQuestion(from: string, clientId: string) {
 }
 
 async function sendExercisePreferencesQuestion(from: string, clientId: string) {
-  const message = "Que tipo de exercícios prefere?";
+  const message = `*Que tipo de exercícios prefere?*
+
+💡 _Use os botões abaixo para responder_
+
+🔄 Para corrigir a última pergunta caso tenha se enganado envie a mensagem *"voltar"* ou *"corrigir"*`;
   const buttons = [
     { id: "musculacao", label: "Musculação" },
     { id: "cardio", label: "Cardio" },
@@ -730,4 +1292,31 @@ export async function transitionToQuestionsState(clientId: string, approvedPlanC
     console.error('❌ Erro ao transicionar para estado QUESTIONS:', error);
     return false;
   }
+}
+
+// Nova função para determinar qual é a pergunta atual baseada no contexto
+function getCurrentQuestionField(context: ClientContext): string | null {
+  // Se tem currentQuestion definida (pergunta com botões), essa é a pergunta atual
+  if (context.currentQuestion) {
+    switch (context.currentQuestion) {
+      case BUTTON_QUESTIONS.GENDER:
+        return 'gender';
+      case BUTTON_QUESTIONS.EXPERIENCE:
+        return 'experience';
+      case BUTTON_QUESTIONS.AVAILABLE_DAYS:
+        return 'available_days';
+      case BUTTON_QUESTIONS.EXERCISE_PREFERENCES:
+        return 'exercise_preferences';
+    }
+  }
+  
+  // Determinar baseado no que ainda não foi preenchido (próxima pergunta esperada)
+  for (const field of QUESTION_ORDER) {
+    if (!context[field] || context[field] === undefined) {
+      return field;
+    }
+  }
+  
+  // Se tudo está preenchido, retornar o último campo (para permitir correção)
+  return QUESTION_ORDER[QUESTION_ORDER.length - 1];
 }

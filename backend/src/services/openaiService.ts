@@ -91,29 +91,22 @@ export async function hasHealthConditions(context: ClientContext): Promise<boole
     const systemPrompt = `
 És um especialista médico em análise de condições de saúde para fitness. A tua tarefa é determinar se uma pessoa tem condições de saúde que requerem atenção especial antes de criar um plano de treino.
 
-Responde APENAS com um objeto JSON no seguinte formato:
+Responde APENAS com um objeto JSON no seguinte formato, sem qualquer texto adicional:
 {
   "has_health_conditions": true/false,
-  "reason": "breve explicação da decisão"
+  "reason": "breve explicação da decisão em Português de Portugal"
 }
 
-Regras para determinar se tem condições de saúde:
+Exemplos:
+- Input: "Nenhuma" → { "has_health_conditions": false, "reason": "Nenhuma condição reportada" }
+- Input: "Dor nas costas" → { "has_health_conditions": true, "reason": "Problema ortopédico que requer precauções" }
+- Input: "Diabetes tipo 2" → { "has_health_conditions": true, "reason": "Doença crónica que afeta o exercício" }
+- Input: "Estou bem" → { "has_health_conditions": false, "reason": "Sem indicação de problemas" }
 
-SIM (has_health_conditions: true) - se a pessoa mencionar:
-- Doenças crónicas (diabetes, hipertensão, problemas cardíacos, etc.)
-- Lesões ou problemas ortopédicos (lesões no joelho, costas, ombros, etc.)
-- Condições médicas que afetam o exercício
-- Medicação que pode interferir com treino
-- Problemas de saúde que requerem precauções
-- Qualquer condição que um personal trainer deveria saber
-
-NÃO (has_health_conditions: false) - se a pessoa disser:
-- Que não tem problemas de saúde
-- Que está saudável
-- Que não tem condições especiais
-- Respostas vagas ou ambíguas que não indicam problemas específicos
-
-IMPORTANTE: Sê conservador. Se houver qualquer dúvida sobre condições de saúde, responde com has_health_conditions: true para garantir segurança.
+Regras:
+- SIM (true): Qualquer menção a doenças, lesões, condições que afetem exercício ou medicação.
+- NÃO (false): Respostas que indiquem ausência de problemas.
+- Em dúvida: Escolhe true para segurança.
 
 Responde sempre em formato JSON válido.
 `;
@@ -128,8 +121,8 @@ Esta pessoa tem condições de saúde que requerem atenção especial para criar
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 100,
-      temperature: 0.1, // Baixa temperatura para respostas mais consistentes
+      max_tokens: 150,
+      temperature: 0,
       response_format: { type: "json_object" },
     });
 
@@ -194,9 +187,10 @@ Motivação: ${context.motivation || "Não especificada"}
   }
 
   const systemPrompt = `
-És um coach PhD em treino e nutrição, altamente qualificado e profissional. O teu papel é criar planos detalhados e personalizados de treino e dieta, adaptados às características e objetivos do cliente. Sê motivacional, claro e organizado na resposta, usando sempre o Português de Portugal.
+És um coach PhD em treino e nutrição, altamente qualificado e profissional. Cria planos detalhados e personalizados de treino e dieta, adaptados às características e objetivos do cliente. Sê motivacional, claro e organizado na resposta, usando sempre o Português de Portugal. Prioriza a segurança, especialmente com condições de saúde, e inclui avisos apropriados. Baseia as recomendações em evidências científicas, inclui progressões semanais e dicas para rastrear progresso.
 `;
 
+  // Improved user prompt: Added more structure, required sections for progress tracking, sample meal plans with calorie estimates, and warm-up/cool-down routines.
   const userPrompt = `
 Cria um plano de treino personalizado e detalhado para o seguinte perfil:
 
@@ -209,9 +203,7 @@ Objetivo: ${context.goal}
 Experiência: ${context.experience || "Não especificada"}
 Dias disponíveis: ${context.available_days || "Não especificados"}
 Condições de saúde: ${context.health_conditions || "Nenhuma"}
-Preferências de exercício: ${
-    context.exercise_preferences || "Não especificadas"
-  }
+Preferências de exercício: ${context.exercise_preferences || "Não especificadas"}
 Restrições alimentares: ${context.dietary_restrictions || "Nenhuma"}
 Equipamento disponível: ${context.equipment || "Não especificado"}
 Motivação: ${context.motivation || "Não especificada"}
@@ -275,7 +267,8 @@ Mensagem de Motivação
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 3000,
+      max_tokens: 10000,
+      temperature: 0.5,
     });
 
     return completion.choices[0].message?.content || "Plano não gerado.";
@@ -288,23 +281,18 @@ export async function detectHumanSupportRequest(
   message: string
 ): Promise<boolean> {
   const systemPrompt = `
-És um assistente especializado em análise de intenções. A tua tarefa é determinar se uma mensagem indica que a pessoa quer falar com um humano/atendente real em vez de continuar com IA.
+És um assistente especializado em análise de intenções. Determina se a mensagem indica desejo de falar com um humano.
 
 Responde APENAS com "SIM" ou "NÃO".
 
-SIM - se a mensagem indica claramente que a pessoa:
-- Quer falar com uma pessoa real/humana
-- Não quer mais IA/robô/bot
-- Pede atendimento humano/pessoal
-- Está frustrada com a IA e quer ajuda humana
-- Menciona que quer falar com um operador/atendente
+Exemplos:
+- "Quero falar com uma pessoa" → SIM
+- "Estou frustrado com o bot" → SIM
+- "Qual é o meu plano de treino?" → NÃO
+- "Pode me passar para suporte humano?" → SIM
 
-NÃO - para todos os outros casos, incluindo:
-- Perguntas normais sobre treino/nutrição
-- Dúvidas sobre o plano
-- Conversas normais
-- Cumprimentos
-- Qualquer outro tipo de mensagem que não seja explicitamente pedir atendimento humano
+SIM se: Pedido explícito por humano, frustração com IA.
+NÃO para: Perguntas normais, conversas casuais.
 `;
 
   const userPrompt = `Mensagem a analisar: "${message}"
@@ -318,7 +306,7 @@ Esta mensagem indica que a pessoa quer falar com um humano em vez da IA?`;
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 10,
+      max_tokens: 20,
       temperature: 0.1, // Baixa temperatura para respostas mais consistentes
     });
 
@@ -392,7 +380,8 @@ Pergunta: ${question}
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages,
-      max_tokens: 600,
+      max_tokens: 800,
+      temperature: 0.7,
     });
 
     const answer =
@@ -439,48 +428,35 @@ export async function chatWithAdminAI(
 
     // Primeiro, usar IA para determinar que dados buscar e construir a query
     const queryAnalysisPrompt = `
-És um especialista em análise de dados e SQL. Analisa a pergunta do admin e determina que dados precisas buscar da base de dados
+És um especialista em análise de dados e SQL. Analisa a pergunta do admin e determina queries necessárias.
 
-ESQUEMA DA BASE DE DADOS (extraído do ficheiro databaseSchema.sql):
+ESQUEMA DA BASE DE DADOS:
 ${dbSchema}
 
-COISAS IMPORTANTES:
-- Se a pergunta for sobre planos pendentes, se o plano já foi aprovado, ele não está pendente.
-- Os numeros de telefone são sempre com o +351. Mas geralmente o admin nao vai usar o 351, vai usar no começo o numero 9... | entao para fazer a query, se o numero nao começar com 351, adiciona o 351 no começo. SEM O + exemplo: 912345678 -> 351912345678
-- NUNCA use subselects (SELECT ...) em condições WHERE. Se precisar filtrar por telefone, faça duas queries: 
-  1. Primeiro, busque o id do cliente pelo telefone.
-  2. Depois, use esse id na query desejada.
+Regras:
+- Para telefones: Se não começa com 351, prefixa com 351 (ex: 912345678 → 351912345678)
+- Evita subselects; faz queries sequenciais.
+- Para contagens: use "select": "count"
+- Responde apenas JSON.
 
-IMPORTANTE PARA CONTAGENS:
-- Para contar registos, usa "select": "count" (não "count(*)")
-- Para buscar dados específicos, usa "select": "campo1, campo2" ou "*"
-- Valores booleanos devem ser "true" ou "false" (sem aspas)
-- Datas devem estar no formato ISO: "2024-01-01"
-
-CONTEXTO DA CONVERSA:
-${
-  adminHistory.length > 0
-    ? adminHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
-    : "Primeira interação"
-}
-
-Responde APENAS com um JSON válido (sem markdown, sem explicações extras) no formato:
+Exemplo JSON:
 {
-  "needsQuery": true/false,
+  "needsQuery": true,
   "queries": [
     {
-      "table": "nome_da_tabela",
-      "select": "campos_a_selecionar", 
-      "where": "condições_opcionais",
-      "orderBy": "ordenação_opcional",
-      "limit": número_opcional,
-      "description": "descrição_do_que_esta_query_vai_buscar"
+      "table": "clients",
+      "select": "id",
+      "where": "phone = '351912345678'",
+      "description": "Obter ID do cliente"
+    },
+    {
+      "table": "plans",
+      "select": "*",
+      "where": "client_id = {id_obtido_na_primeira_query}",
+      "description": "Obter planos do cliente"
     }
   ]
 }
-
-Se não precisar de queries específicas, retorna needsQuery: false.
-IMPORTANTE: Responde apenas o JSON, sem blocos de código ou qualquer outro texto.
 `;
 
     const queryAnalysis = await openai.chat.completions.create({
@@ -489,8 +465,8 @@ IMPORTANTE: Responde apenas o JSON, sem blocos de código ou qualquer outro text
         { role: "system", content: queryAnalysisPrompt },
         { role: "user", content: `Pergunta atual: ${message}` },
       ],
-      max_tokens: 1000,
-      temperature: 0.7,
+      max_tokens: 1500,
+      temperature: 0.5,
     });
 
     const queryResponse = queryAnalysis.choices[0].message?.content;
@@ -692,31 +668,15 @@ IMPORTANTE: Responde apenas o JSON, sem blocos de código ou qualquer outro text
 
     // Agora usar a IA para interpretar os resultados e responder
     const interpretationPrompt = `
-És um assistente de IA especializado em análise de dados de um sistema de WhatsApp Bot para coaching de treino e nutrição.
+És um assistente de IA para análise de dados. Responde sempre em Português de Portugal, de forma clara e profissional. Fornece insights, tendências e responde diretamente à pergunta.
 
-CONTEXTO DA CONVERSA ANTERIOR:
-${
-  adminHistory.length > 0
-    ? adminHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
-    : "Esta é a primeira interação"
-}
+Estrutura da resposta:
+1. Resumo dos dados
+2. Análise e insights
+3. Recomendações se aplicável
 
-${
-  databaseResults
-    ? `
-DADOS OBTIDOS DA BASE DE DADOS:
-${databaseResults}
-`
-    : `
-Não foram necessárias queries específicas para esta pergunta.
-`
-}
-
-Responde sempre em Português de Portugal, de forma clara e profissional. Analisa os dados, fornece insights úteis, identifica tendências e responde à pergunta específica do admin.
-
-Considera o contexto da conversa anterior para dar respostas mais relevantes e personalizadas. Se o admin fez perguntas relacionadas anteriormente, refere-te a elas quando apropriado.
-
-Se não houve dados suficientes, explica o que seria necessário para obter uma resposta mais completa.
+Contexto: ${adminHistory.length > 0 ? adminHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n") : "Esta é a primeira interação"}
+Dados: ${databaseResults || 'Nenhum dado necessário.'}
 `;
 
     const finalResponse = await openai.chat.completions.create({
@@ -725,7 +685,7 @@ Se não houve dados suficientes, explica o que seria necessário para obter uma 
         { role: "system", content: interpretationPrompt },
         { role: "user", content: `Pergunta original: ${message}` },
       ],
-      max_tokens: 1000,
+      max_tokens: 1500,
       temperature: 0.7,
     });
 
@@ -773,28 +733,13 @@ export async function generateConversationTitleWithAI(
     const recentMessages = conversationHistory.slice(0, 5);
     
     const systemPrompt = `
-És um assistente especializado em criar títulos curtos e descritivos para conversas. 
+És especialista em títulos. Cria títulos de no máximo 6 palavras em Português de Portugal, descritivos e concisos.
 
-REGRAS IMPORTANTES:
-- O título deve ter no máximo 6 palavras
-- Deve ser descritivo e resumir o assunto principal da conversa
-- Use português de Portugal
-- Seja conciso mas informativo
-- Não use pontuação no final
-- Não use aspas
-- Se a conversa for sobre consultas à base de dados, use termos como "Consulta", "Análise", "Estatísticas"
-- Se for sobre clientes, use "Clientes", "Gestão"
-- Se for sobre planos, use "Planos", "Aprovação"
-- Se for sobre mensagens, use "Mensagens", "Comunicação"
+Exemplos:
+- Pergunta sobre stats: "Estatísticas de Clientes"
+- Sobre planos: "Análise Planos Pendentes"
 
-Exemplos de bons títulos:
-- "Consulta estatísticas clientes"
-- "Análise planos pendentes"
-- "Gestão mensagens hoje"
-- "Relatório atividade semanal"
-- "Configuração sistema IA"
-
-Responde APENAS com o título, sem aspas, sem pontuação extra, sem explicações.
+Responde apenas o título.
 `;
 
     const userPrompt = `
@@ -809,7 +754,7 @@ Cria um título curto e descritivo para esta conversa:`;
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 50,
+      max_tokens: 100,
       temperature: 0.3, // Baixa temperatura para títulos mais consistentes
     });
 
